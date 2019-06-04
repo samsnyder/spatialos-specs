@@ -1,0 +1,9 @@
+[package]
+name = "spatial-specs"
+version = "0.1.0"
+authors = ["sam <samsnyder96@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+spatialos-sdk = { path = "../spatialos-sdk-rs/spatialos-sdk" }
+specs = "0.14.3"
