@@ -15,14 +15,11 @@ use specs::shred::{CastFrom, Fetch, FetchMut, ResourceId};
 use crate::*;
 
 
-
-
-
 pub type SpatialReadStorage<'a, T> = SpatialStorage<'a, SynchronisedComponent<T>, Fetch<'a, MaskedStorage<SynchronisedComponent<T>>>>;
 
 impl<'a, T> SystemData<'a> for SpatialReadStorage<'a, T>
 where
-    T: 'static + SpatialComponent + Send + Sync + Debug,
+    T: 'static + SpatialComponent + TypeConversion + Send + Sync + Debug,
 {
     fn setup(res: &mut Resources) {
         ReadStorage::<'a, SynchronisedComponent<T>>::setup(res);
@@ -46,7 +43,7 @@ pub type SpatialWriteStorage<'a, T> = SpatialStorage<'a, SynchronisedComponent<T
 
 impl<'a, T> SystemData<'a> for SpatialWriteStorage<'a, T>
 where
-    T: 'static + SpatialComponent + Send + Sync + Debug,
+    T: 'static + SpatialComponent + TypeConversion + Send + Sync + Debug,
 {
     fn setup(res: &mut Resources) {
         WriteStorage::<'a, SynchronisedComponent<T>>::setup(res);

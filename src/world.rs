@@ -6,7 +6,7 @@ use std::marker::PhantomData;
 use std::collections::HashMap;
 use spatialos_sdk::worker::*;
 use specs::world::Index;
-use spatialos_sdk::worker::component::ComponentId;
+use spatialos_sdk::worker::component::{UpdateParameters, ComponentId};
 use spatialos_sdk::worker::component::VTable;
 use std::fmt::Debug;
 use crate::*;
@@ -29,12 +29,16 @@ impl<T: 'static + SpatialComponent + Sync + Send + Clone + Debug> ComponentDispa
 	}
 
     fn replicate(&self, world: &mut World, connection: &mut WorkerConnection) {
-        let entities = world.entities();
+        let entity_ids = world.system_data::<ReadStorage<WrappedEntityId>>();
         let mut storage = world.system_data::<WriteStorage<SynchronisedComponent<T>>>();
 
-        for (entity, component) in (&entities, &mut storage).join() {
+        for (entity_id, component) in (&entity_ids, &mut storage).join() {
             if component.get_and_clear_dity_bit() {
-                println!("dirty {:?}", component);
+                connection.send_component_update::<T>(
+                    entity_id.0,
+                    component.to_update(),
+                    UpdateParameters::default(),
+                );
             }
         }
     }
@@ -59,6 +63,10 @@ impl WorldReader {
 		reader
 	}
 
+    pub fn setup(&self, world: &mut World) {
+        world.register::<WrappedEntityId>();
+    }
+
     pub fn register_component<C: 'static + SpatialComponent + Sync + Send + Clone + Debug>(&mut self) {
         let interface = ComponentDispatcher::<C>{
             _phantom: PhantomData
@@ -79,8 +87,9 @@ impl WorldReader {
 
             match op {
             	WorkerOp::AddEntity(add_entity_op) => {
-                    let entity = world.create_entity().build();
+                    let entity = world.create_entity().with(WrappedEntityId(add_entity_op.entity_id)).build();
                     self.spatial_to_specs_entity.insert(add_entity_op.entity_id, entity);
+
                 }
 
             	WorkerOp::AddComponent(add_component) => {

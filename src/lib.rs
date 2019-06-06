@@ -1,4 +1,5 @@
 use spatialos_sdk::worker::component::Component as SpatialComponent;
+use spatialos_sdk::worker::component::TypeConversion;
 use std::ops::{DerefMut, Deref};
 use specs::prelude::*;
 use spatialos_sdk::worker::op::*;
@@ -6,6 +7,8 @@ use specs::shred::{Fetch, ResourceId, SystemData, Resource};
 use specs::storage::MaskedStorage;
 use std::marker::PhantomData;
 use std::fmt::Debug;
+use spatialos_sdk::worker::EntityId;
+use spatialos_sdk::worker::internal::schema::SchemaComponentUpdate;
 
 pub mod world;
 pub mod storage;
@@ -16,7 +19,7 @@ pub struct SynchronisedComponent<T: SpatialComponent + Debug> {
     is_dirty: bool
 }
 
-impl<T: SpatialComponent + Debug> SynchronisedComponent<T> {
+impl<T: SpatialComponent + TypeConversion + Debug> SynchronisedComponent<T> {
 	pub fn new(value: T) -> SynchronisedComponent<T> {
 		SynchronisedComponent {
 			value,
@@ -28,6 +31,15 @@ impl<T: SpatialComponent + Debug> SynchronisedComponent<T> {
         let is_dirty = self.is_dirty;
         self.is_dirty = false;
         is_dirty
+    }
+
+    // TODO - this is really bad as it seriliases then deserialises.
+    pub(crate) fn to_update(&self) -> T::Update {
+        let schema_update = SchemaComponentUpdate::new(T::ID);
+        let mut fields = schema_update.fields();
+        T::to_type(&self.value, &mut fields);
+
+        T::Update::from_type(&fields).unwrap()
     }
 }
 
@@ -54,59 +66,9 @@ where
 }
 
 
-// pub type SpatialReadStorage<'a, T> = Storage<'a, SynchronisedComponent<T>, SpatialFetch<'a, MaskedStorage<SynchronisedComponent<T>>>>;
-// pub type SpatialWriteStorage<'a, T> = WriteStorage<'a, SynchronisedComponent<T>>;
+pub(crate) struct WrappedEntityId(EntityId);
 
-
-// pub struct SpatialReadStorage<'a, T>(ReadStorage<'a, SynchronisedComponent<T>>) where T: 'static + SpatialComponent + Sync + Send;
-pub type SpatialReadStorage<'a, T> = ReadStorage<'a, SynchronisedComponent<T>>;
-pub type SpatialWriteStorage<'a, T> = WriteStorage<'a, SynchronisedComponent<T>>;
-
-
-// impl<'a, T> SystemData<'a> for SpatialReadStorage<'a, T>
-// where
-//     T: 'static + SpatialComponent + Sync + Send,
-// {
-//     fn setup(res: &mut Resources) {
-//         ReadStorage::<'a, SynchronisedComponent<T>>::setup(res);
-//     }
-
-//     fn fetch(res: &'a Resources) -> Self {
-//         // unimplemented!();
-//         Storage::new(res.fetch(), res.fetch())
-//         // SpatialReadStorage(ReadStorage::<'a, SynchronisedComponent<T>>::fetch(res))
-//     }
-
-//     fn reads() -> Vec<ResourceId> {
-//         ReadStorage::<'a, SynchronisedComponent<T>>::reads()
-//     }
-
-//     fn writes() -> Vec<ResourceId> {
-//         ReadStorage::<'a, SynchronisedComponent<T>>::writes()
-//     }
-// }
-
-
-
-// pub struct SpatialFetch<'a, T: 'a>(Fetch<'a, T>);
-
-// impl<'a, T> Deref for SpatialFetch<'a, T>
-// where
-//     T: Resource,
-// {
-//     type Target = T;
-
-//     fn deref(&self) -> &T {
-//         self.0.deref()
-//     }
-// }
-
-// impl<'a, T> Clone for SpatialFetch<'a, T> {
-//     fn clone(&self) -> Self {
-//         SpatialFetch(Fetch {
-//             inner: self.inner.clone(),
-//             phantom: PhantomData,
-//         })
-//     }
-// }
+impl Component for WrappedEntityId {
+    type Storage = VecStorage<Self>;
+}
 
