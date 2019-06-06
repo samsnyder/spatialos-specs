@@ -1,6 +1,7 @@
 use specs::prelude::*;
 use specs::world::*;
 use specs::storage::*;
+use spatialos_sdk::worker::component::Component as SpatialComponent;
 
 use std::{
     self,
@@ -9,21 +10,22 @@ use std::{
 };
 
 use hibitset::{BitSet, BitSetLike, BitSetNot};
-use specs::shred::{CastFrom, Fetch, ResourceId};
+use specs::shred::{CastFrom, Fetch, FetchMut, ResourceId};
+
+use crate::*;
 
 
 
 
 
-
-pub type SpatialReadStorage<'a, T> = SpatialStorage<'a, T, Fetch<'a, MaskedStorage<T>>>;
+pub type SpatialReadStorage<'a, T> = SpatialStorage<'a, SynchronisedComponent<T>, Fetch<'a, MaskedStorage<SynchronisedComponent<T>>>>;
 
 impl<'a, T> SystemData<'a> for SpatialReadStorage<'a, T>
 where
-    T: Component,
+    T: 'static + SpatialComponent + Send + Sync + Debug,
 {
     fn setup(res: &mut Resources) {
-        ReadStorage::<'a, T>::setup(res);
+        ReadStorage::<'a, SynchronisedComponent<T>>::setup(res);
     }
 
     fn fetch(res: &'a Resources) -> Self {
@@ -31,11 +33,35 @@ where
     }
 
     fn reads() -> Vec<ResourceId> {
-        ReadStorage::<'a, T>::reads()
+        ReadStorage::<'a, SynchronisedComponent<T>>::reads()
     }
 
     fn writes() -> Vec<ResourceId> {
-        ReadStorage::<'a, T>::writes()
+        ReadStorage::<'a, SynchronisedComponent<T>>::writes()
+    }
+}
+
+
+pub type SpatialWriteStorage<'a, T> = SpatialStorage<'a, SynchronisedComponent<T>, FetchMut<'a, MaskedStorage<SynchronisedComponent<T>>>>;
+
+impl<'a, T> SystemData<'a> for SpatialWriteStorage<'a, T>
+where
+    T: 'static + SpatialComponent + Send + Sync + Debug,
+{
+    fn setup(res: &mut Resources) {
+        WriteStorage::<'a, SynchronisedComponent<T>>::setup(res);
+    }
+
+    fn fetch(res: &'a Resources) -> Self {
+    	SpatialStorage::new(res.fetch(), res.fetch_mut())
+    }
+
+    fn reads() -> Vec<ResourceId> {
+        WriteStorage::<'a, SynchronisedComponent<T>>::reads()
+    }
+
+    fn writes() -> Vec<ResourceId> {
+        WriteStorage::<'a, SynchronisedComponent<T>>::writes()
     }
 }
 

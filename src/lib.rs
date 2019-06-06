@@ -1,27 +1,37 @@
 use spatialos_sdk::worker::component::Component as SpatialComponent;
-use std::ops::Deref;
+use std::ops::{DerefMut, Deref};
 use specs::prelude::*;
 use spatialos_sdk::worker::op::*;
 use specs::shred::{Fetch, ResourceId, SystemData, Resource};
 use specs::storage::MaskedStorage;
 use std::marker::PhantomData;
+use std::fmt::Debug;
 
 pub mod world;
 pub mod storage;
 
-pub struct SynchronisedComponent<T: SpatialComponent> {
-    pub value: T,
+#[derive(Debug)]
+pub struct SynchronisedComponent<T: SpatialComponent + Debug> {
+    value: T,
+    is_dirty: bool
 }
 
-impl<T: SpatialComponent> SynchronisedComponent<T> {
+impl<T: SpatialComponent + Debug> SynchronisedComponent<T> {
 	pub fn new(value: T) -> SynchronisedComponent<T> {
 		SynchronisedComponent {
-			value
+			value,
+            is_dirty: false
 		}
 	}
+
+    pub(crate) fn get_and_clear_dity_bit(&mut self) -> bool {
+        let is_dirty = self.is_dirty;
+        self.is_dirty = false;
+        is_dirty
+    }
 }
 
-impl<T: SpatialComponent> Deref for SynchronisedComponent<T> {
+impl<T: SpatialComponent + Debug> Deref for SynchronisedComponent<T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
@@ -29,7 +39,14 @@ impl<T: SpatialComponent> Deref for SynchronisedComponent<T> {
     }
 }
 
-impl<T: 'static + Sync + Send> Component for SynchronisedComponent<T>
+impl<T: SpatialComponent + Debug> DerefMut for SynchronisedComponent<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.is_dirty = true;
+        &mut self.value
+    }
+}
+
+impl<T: 'static + Sync + Send + Debug> Component for SynchronisedComponent<T>
 where
     T: SpatialComponent,
 {
