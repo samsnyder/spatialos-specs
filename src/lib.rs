@@ -7,6 +7,7 @@ use specs::storage::MaskedStorage;
 use std::marker::PhantomData;
 
 pub mod world;
+pub mod storage;
 
 pub struct SynchronisedComponent<T: SpatialComponent> {
     pub value: T,
@@ -91,3 +92,4 @@ pub type SpatialWriteStorage<'a, T> = WriteStorage<'a, SynchronisedComponent<T>>
 //         })
 //     }
 // }
+
