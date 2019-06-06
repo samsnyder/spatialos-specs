@@ -41,6 +41,10 @@ impl<T: SpatialComponent + TypeConversion + Debug> SynchronisedComponent<T> {
 
         T::Update::from_type(&fields).unwrap()
     }
+
+    pub(crate) fn apply_update(&mut self, update: T::Update) {
+        self.value.merge(update);
+    }
 }
 
 impl<T: SpatialComponent + Debug> Deref for SynchronisedComponent<T> {
