@@ -22,6 +22,7 @@ where
     T: 'static + SpatialComponent,
 {
     fn setup(res: &mut Resources) {
+        WorldReader::register_component::<T>(res);
         ReadStorage::<'a, SynchronisedComponent<T>>::setup(res);
     }
 
@@ -46,6 +47,7 @@ where
     T: 'static + SpatialComponent,
 {
     fn setup(res: &mut Resources) {
+        WorldReader::register_component::<T>(res);
         WriteStorage::<'a, SynchronisedComponent<T>>::setup(res);
     }
 
