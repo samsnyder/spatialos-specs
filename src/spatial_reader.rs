@@ -12,6 +12,7 @@ use std::fmt::Debug;
 use crate::*;
 use crate::storage::*;
 use crate::component_registry::*;
+use spatialos_sdk::worker::*;
 
 pub struct SpatialReader {
     spatial_to_specs_entity: HashMap<EntityId, Entity>
@@ -60,6 +61,15 @@ impl SpatialReader {
                         }
                     }
                 },
+                WorkerOp::AuthorityChange(authority_change) => {
+                    match res.fetch::<ComponentRegistry>().get_interface(authority_change.component_id) {
+                        None => {},
+                        Some(interface) => {
+                            let entity = self.spatial_to_specs_entity[&authority_change.entity_id];
+                            interface.apply_authority_change(res, entity, authority_change);
+                        }
+                    }
+                }
                 _ => {}
             }
         }

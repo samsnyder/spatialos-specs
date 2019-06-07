@@ -9,6 +9,7 @@ use specs::world::*;
 use spatialos_sdk::worker::component::{UpdateParameters, ComponentId};
 use spatialos_sdk::worker::component::VTable;
 use std::fmt::Debug;
+use spatialos_sdk::worker::*;
 use crate::*;
 use crate::storage::*;
 
@@ -28,6 +29,7 @@ impl ComponentRegistry {
         res.entry::<ComponentRegistry>()
             .or_insert_with(|| ComponentRegistry::new())
             .register_component_on_self::<C>();
+        res.insert(AuthorityBitSet::<C>::new());
     }
 
     fn register_component_on_self<C: 'static + SpatialComponent>(&mut self) {
@@ -53,6 +55,7 @@ struct ComponentDispatcher<C: 'static + SpatialComponent + Sync + Send + Clone +
 pub(crate) trait ComponentDispatcherInterface {
 	fn add_component_to_world<'b>(&self, res: &Resources, entity: Entity, add_component: AddComponentOp);
     fn apply_component_update<'b>(&self, res: &Resources, entity: Entity, component_update: ComponentUpdateOp);
+    fn apply_authority_change<'b>(&self, res: &Resources, entity: Entity, authority_change: AuthorityChangeOp);
     fn replicate(&self, res: &Resources, connection: &mut WorkerConnection);
 }
 
@@ -69,6 +72,10 @@ impl<T: 'static + SpatialComponent + Sync + Send + Clone + Debug> ComponentDispa
         let update = component_update.get::<T>().unwrap().clone();
 
         storage.get_mut(entity).unwrap().apply_update(update);
+    }
+
+    fn apply_authority_change<'b>(&self, res: &Resources, entity: Entity, authority_change: AuthorityChangeOp) {
+        res.fetch_mut::<AuthorityBitSet<T>>().set_authority(entity, authority_change.authority);
     }
 
     fn replicate(&self, res: &Resources, connection: &mut WorkerConnection) {

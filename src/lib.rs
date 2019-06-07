@@ -9,6 +9,7 @@ use std::marker::PhantomData;
 use std::fmt::Debug;
 use spatialos_sdk::worker::EntityId;
 use spatialos_sdk::worker::internal::schema::SchemaComponentUpdate;
+use spatialos_sdk::worker::*;
 
 pub mod spatial_reader;
 pub mod spatial_writer;
@@ -64,9 +65,7 @@ impl<T: SpatialComponent + Debug> DerefMut for SynchronisedComponent<T> {
     }
 }
 
-impl<T: 'static + Sync + Send + Debug> Component for SynchronisedComponent<T>
-where
-    T: SpatialComponent,
+impl<T: 'static + SpatialComponent> Component for SynchronisedComponent<T>
 {
     type Storage = VecStorage<Self>;
 }
@@ -78,3 +77,24 @@ impl Component for WrappedEntityId {
     type Storage = VecStorage<Self>;
 }
 
+pub(crate) struct AuthorityBitSet<T: SpatialComponent> {
+    mask: BitSet,
+    _phantom: PhantomData<T>
+}
+
+impl<T: SpatialComponent> AuthorityBitSet<T> {
+    pub fn new() -> AuthorityBitSet<T> {
+        AuthorityBitSet {
+            mask: BitSet::new(),
+            _phantom: PhantomData
+        }
+    }
+
+    pub fn set_authority(&mut self, e: Entity, authority: Authority) {
+        if authority == Authority::NotAuthoritative {
+            self.mask.remove(e.id());
+        }else{
+            self.mask.add(e.id());
+        }
+    }
+}

@@ -9,14 +9,16 @@ use std::{
     ops::{Deref, DerefMut, Not},
 };
 
-use hibitset::{BitSet, BitSetLike, BitSetNot};
+use hibitset::{BitSet, BitSetLike, BitSetAnd, BitSetNot};
 use specs::shred::{CastFrom, Fetch, FetchMut, ResourceId};
+
+use specs::join::BitAnd;
 
 use crate::*;
 use crate::spatial_reader::*;
 use crate::component_registry::*;
 
-pub type SpatialReadStorage<'a, T> = SpatialStorage<'a, SynchronisedComponent<T>, Fetch<'a, MaskedStorage<SynchronisedComponent<T>>>>;
+pub type SpatialReadStorage<'a, T> = SpatialStorage<'a, T, Fetch<'a, MaskedStorage<SynchronisedComponent<T>>>>;
 
 impl<'a, T> SystemData<'a> for SpatialReadStorage<'a, T>
 where
@@ -28,7 +30,7 @@ where
     }
 
     fn fetch(res: &'a Resources) -> Self {
-    	SpatialStorage::new(res.fetch(), res.fetch())
+    	SpatialStorage::new(res.fetch(), res.fetch(), res.fetch())
     }
 
     fn reads() -> Vec<ResourceId> {
@@ -41,7 +43,7 @@ where
 }
 
 
-pub type SpatialWriteStorage<'a, T> = SpatialStorage<'a, SynchronisedComponent<T>, FetchMut<'a, MaskedStorage<SynchronisedComponent<T>>>>;
+pub type SpatialWriteStorage<'a, T> = SpatialStorage<'a, T, FetchMut<'a, MaskedStorage<SynchronisedComponent<T>>>>;
 
 impl<'a, T> SystemData<'a> for SpatialWriteStorage<'a, T>
 where
@@ -53,7 +55,7 @@ where
     }
 
     fn fetch(res: &'a Resources) -> Self {
-    	SpatialStorage::new(res.fetch(), res.fetch_mut())
+    	SpatialStorage::new(res.fetch(), res.fetch_mut(), res.fetch())
     }
 
     fn reads() -> Vec<ResourceId> {
@@ -66,35 +68,32 @@ where
 }
 
 
-
-
-
-
-
 /// A wrapper around the masked SpatialStorage and the generations vector.
 /// Can be used for safe lookup of components, insertions and removes.
 /// This is what `World::read/write` fetches for the user.
-pub struct SpatialStorage<'e, T, D> {
-    storage: Storage<'e, T, D>
+pub struct SpatialStorage<'e, T, D> where T: 'static + SpatialComponent {
+    storage: Storage<'e, SynchronisedComponent<T>, D>,
+    authority: Fetch<'e, AuthorityBitSet<T>>
 }
 
-impl<'e, T, D> SpatialStorage<'e, T, D> {
+impl<'e, T, D> SpatialStorage<'e, T, D> where T: 'static + SpatialComponent {
     /// Creates a new `SpatialStorage` from a fetched allocator and a immutable or
     /// mutable `MaskedStorage`, named `data`.
-    pub fn new(entities: Fetch<'e, EntitiesRes>, data: D) -> SpatialStorage<'e, T, D> {
+    pub(crate) fn new(entities: Fetch<'e, EntitiesRes>, data: D, authority: Fetch<'e, AuthorityBitSet<T>>) -> SpatialStorage<'e, T, D> {
         SpatialStorage {
-            storage: Storage::new(entities, data)
+            storage: Storage::new(entities, data),
+            authority
         }
     }
 }
 
 impl<'e, T, D> SpatialStorage<'e, T, D>
 where
-    T: Component,
-    D: Deref<Target = MaskedStorage<T>>,
+    T: 'static + SpatialComponent,
+    D: Deref<Target = MaskedStorage<SynchronisedComponent<T>>>,
 {
     /// Gets the wrapped SpatialStorage.
-    pub fn unprotected_storage(&self) -> &T::Storage {
+    pub fn unprotected_storage(&self) -> &<SynchronisedComponent<T> as Component>::Storage {
         self.storage.unprotected_storage()
     }
 
@@ -107,7 +106,7 @@ where
     }
 
     /// Tries to read the data associated with an `Entity`.
-    pub fn get(&self, e: Entity) -> Option<&T> {
+    pub fn get(&self, e: Entity) -> Option<&SynchronisedComponent<T>> {
         self.storage.get(e)
     }
 
@@ -138,8 +137,8 @@ where
 
 impl<'e, T, D> SpatialStorage<'e, T, D>
 where
-    T: Component,
-    D: DerefMut<Target = MaskedStorage<T>>,
+    T: 'static + SpatialComponent,
+    D: DerefMut<Target = MaskedStorage<SynchronisedComponent<T>>>,
 {
     /// Gets mutable access to the wrapped SpatialStorage.
     ///
@@ -148,12 +147,12 @@ where
     /// This is unsafe because modifying the wrapped SpatialStorage without also
     /// updating the mask bitset accordingly can result in illegal memory
     /// access.
-    pub unsafe fn unprotected_storage_mut(&mut self) -> &mut T::Storage {
+    pub unsafe fn unprotected_storage_mut(&mut self) -> &mut <SynchronisedComponent<T> as Component>::Storage {
         self.storage.unprotected_storage_mut()
     }
 
     /// Tries to mutate the data associated with an `Entity`.
-    pub fn get_mut(&mut self, e: Entity) -> Option<&mut T> {
+    pub fn get_mut(&mut self, e: Entity) -> Option<&mut SynchronisedComponent<T>> {
         self.storage.get_mut(e)
     }
 
@@ -163,12 +162,12 @@ where
     /// If a component already existed for the given `Entity`, then it will
     /// be overwritten with the new component. If it did overwrite, then the
     /// result will contain `Some(T)` where `T` is the previous component.
-    pub fn insert(&mut self, e: Entity, mut v: T) -> InsertResult<T> {
+    pub fn insert(&mut self, e: Entity, mut v: SynchronisedComponent<T>) -> InsertResult<SynchronisedComponent<T>> {
         self.storage.insert(e, v)
     }
 
     /// Removes the data associated with an `Entity`.
-    pub fn remove(&mut self, e: Entity) -> Option<T> {
+    pub fn remove(&mut self, e: Entity) -> Option<SynchronisedComponent<T>> {
         self.storage.remove(e)
     }
 
@@ -186,19 +185,19 @@ where
 
 // SAFETY: This is safe, since `T::SpatialStorage` is `DistinctStorage` and `Join::get`
 // only accesses the SpatialStorage and nothing else.
-unsafe impl<'a, T: Component, D> DistinctStorage for SpatialStorage<'a, T, D> where
-    T::Storage: DistinctStorage
+unsafe impl<'a, T: 'static + SpatialComponent, D> DistinctStorage for SpatialStorage<'a, T, D> where
+    <SynchronisedComponent<T> as Component>::Storage: DistinctStorage
 {
 }
 
 impl<'a, 'e, T, D: 'a> Join for &'a SpatialStorage<'e, T, D>
 where
-    T: Component,
-    D: Deref<Target = MaskedStorage<T>>,
+    T: 'static + SpatialComponent,
+    D: Deref<Target = MaskedStorage<SynchronisedComponent<T>>>,
 {
     type Mask = &'a BitSet;
-    type Type = &'a T;
-    type Value = &'a T::Storage;
+    type Type = &'a SynchronisedComponent<T>;
+    type Value = &'a <SynchronisedComponent<T> as Component>::Storage;
 
     // SAFETY: No unsafe code and no invariants.
     unsafe fn open(self) -> (Self::Mask, Self::Value) {
@@ -207,15 +206,15 @@ where
 
     // SAFETY: Since we require that the mask was checked, an element for `i` must
     // have been inserted without being removed.
-    unsafe fn get(v: &mut Self::Value, i: Index) -> &'a T {
-        <&'a Storage<'a, T, D> as Join>::get(v, i)
+    unsafe fn get(v: &mut Self::Value, i: Index) -> &'a SynchronisedComponent<T> {
+        <&'a Storage<'a, SynchronisedComponent<T>, D> as Join>::get(v, i)
     }
 }
 
 impl<'a, 'e, T, D> Not for &'a SpatialStorage<'e, T, D>
 where
-    T: Component,
-    D: Deref<Target = MaskedStorage<T>>,
+    T: 'static + SpatialComponent,
+    D: Deref<Target = MaskedStorage<SynchronisedComponent<T>>>,
 {
     type Output = AntiStorage<'a>;
 
@@ -229,30 +228,32 @@ where
 #[cfg(feature = "parallel")]
 unsafe impl<'a, 'e, T, D> ParJoin for &'a SpatialStorage<'e, T, D>
 where
-    T: Component,
-    D: Deref<Target = MaskedStorage<T>>,
+    T: 'static + SpatialComponent,
+    D: Deref<Target = MaskedStorage<SynchronisedComponent<T>>>,
     T::Storage: Sync,
 {
 }
 
 impl<'a, 'e, T, D: 'a> Join for &'a mut SpatialStorage<'e, T, D>
 where
-    T: Component,
-    D: DerefMut<Target = MaskedStorage<T>>,
+    T: 'static + SpatialComponent,
+    D: DerefMut<Target = MaskedStorage<SynchronisedComponent<T>>>,
 {
-    type Mask = &'a BitSet;
-    type Type = &'a mut T;
-    type Value = &'a mut T::Storage;
+    type Mask = BitSetAnd<&'a BitSet, &'a BitSet>;
+    // type Mask = &'a BitSet;
+    type Type = &'a mut SynchronisedComponent<T>;
+    type Value = &'a mut <SynchronisedComponent<T> as Component>::Storage;
 
     // SAFETY: No unsafe code and no invariants to fulfill.
     unsafe fn open(self) -> (Self::Mask, Self::Value) {
     	let storage = &mut self.storage;
-        storage.open()
+        let (mask, value) = storage.open();
+        ((&self.authority.mask, mask).and(), value)
     }
 
     // TODO: audit unsafe
-    unsafe fn get(v: &mut Self::Value, i: Index) -> &'a mut T {
-        <&'a mut Storage<'a, T, D> as Join>::get(v, i)
+    unsafe fn get(v: &mut Self::Value, i: Index) -> &'a mut SynchronisedComponent<T> {
+        <&'a mut Storage<'a, SynchronisedComponent<T>, D> as Join>::get(v, i)
     }
 }
 
@@ -260,8 +261,8 @@ where
 #[cfg(feature = "parallel")]
 unsafe impl<'a, 'e, T, D> ParJoin for &'a mut SpatialStorage<'e, T, D>
 where
-    T: Component,
-    D: DerefMut<Target = MaskedStorage<T>>,
+    T: 'static + SpatialComponent,
+    D: DerefMut<Target = MaskedStorage<SynchronisedComponent<T>>>,
     T::Storage: Sync + DistinctStorage,
 {
 }
