@@ -40,7 +40,7 @@ impl<T: SpatialComponent + TypeConversion + Debug> SynchronisedComponent<T> {
     pub(crate) fn to_update(&self) -> T::Update {
         let schema_update = SchemaComponentUpdate::new(T::ID);
         let mut fields = schema_update.fields();
-        T::to_type(&self.value, &mut fields);
+        T::to_type(&self.value, &mut fields).unwrap();
 
         T::Update::from_type(&fields).unwrap()
     }

@@ -38,12 +38,15 @@ impl SpatialReader {
                 WorkerOp::AddEntity(add_entity_op) => {
                     let entity = res.fetch_mut::<EntitiesRes>().create();
                     let mut entity_id_storage = WriteStorage::<WrappedEntityId>::fetch(res);
-                    entity_id_storage.insert(entity, WrappedEntityId(add_entity_op.entity_id));
+                    entity_id_storage.insert(entity, WrappedEntityId(add_entity_op.entity_id)).unwrap();
 
                     self.spatial_to_specs_entity
                         .insert(add_entity_op.entity_id, entity);
                 }
-
+                WorkerOp::RemoveEntity(remove_entity_op) => {
+                    let entity = self.spatial_to_specs_entity[&remove_entity_op.entity_id];
+                    res.fetch_mut::<EntitiesRes>().delete(entity);
+                }
                 WorkerOp::AddComponent(add_component) => {
                     match res
                         .fetch::<ComponentRegistry>()
@@ -52,7 +55,19 @@ impl SpatialReader {
                         None => {}
                         Some(interface) => {
                             let entity = self.spatial_to_specs_entity[&add_component.entity_id];
-                            interface.add_component_to_world(res, entity, add_component);
+                            interface.add_component(res, entity, add_component);
+                        }
+                    }
+                }
+                WorkerOp::RemoveComponent(remove_component) => {
+                    match res
+                        .fetch::<ComponentRegistry>()
+                        .get_interface(remove_component.component_id)
+                    {
+                        None => {}
+                        Some(interface) => {
+                            let entity = self.spatial_to_specs_entity[&remove_component.entity_id];
+                            interface.remove_component(res, entity);
                         }
                     }
                 }

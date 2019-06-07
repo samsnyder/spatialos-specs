@@ -57,11 +57,16 @@ struct ComponentDispatcher<C: 'static + SpatialComponent + Sync + Send + Clone +
 }
 
 pub(crate) trait ComponentDispatcherInterface {
-    fn add_component_to_world<'b>(
+    fn add_component<'b>(
         &self,
         res: &Resources,
         entity: Entity,
         add_component: AddComponentOp,
+    );
+    fn remove_component<'b>(
+        &self,
+        res: &Resources,
+        entity: Entity
     );
     fn apply_component_update<'b>(
         &self,
@@ -81,7 +86,7 @@ pub(crate) trait ComponentDispatcherInterface {
 impl<T: 'static + SpatialComponent + Sync + Send + Clone + Debug> ComponentDispatcherInterface
     for ComponentDispatcher<T>
 {
-    fn add_component_to_world<'b>(
+    fn add_component<'b>(
         &self,
         res: &Resources,
         entity: Entity,
@@ -90,7 +95,16 @@ impl<T: 'static + SpatialComponent + Sync + Send + Clone + Debug> ComponentDispa
         let mut storage: SpatialWriteStorage<T> = SpatialStorage::fetch(res);
         let data = add_component.get::<T>().unwrap().clone();
 
-        storage.insert(entity, SynchronisedComponent::new(data));
+        storage.insert(entity, SynchronisedComponent::new(data)).unwrap();
+    }
+
+    fn remove_component<'b>(
+        &self,
+        res: &Resources,
+        entity: Entity
+    ) {
+        let mut storage: SpatialWriteStorage<T> = SpatialStorage::fetch(res);
+        storage.remove(entity);
     }
 
     fn apply_component_update<'b>(

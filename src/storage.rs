@@ -177,7 +177,7 @@ where
     pub fn insert(
         &mut self,
         e: Entity,
-        mut v: SynchronisedComponent<T>,
+        v: SynchronisedComponent<T>,
     ) -> InsertResult<SynchronisedComponent<T>> {
         self.storage.insert(e, v)
     }
