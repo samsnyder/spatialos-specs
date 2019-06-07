@@ -1,69 +1,79 @@
+use crate::component_registry::*;
+use crate::storage::*;
+use crate::*;
 use spatialos_sdk::worker::component::Component as SpatialComponent;
-use specs::prelude::*;
+use spatialos_sdk::worker::component::VTable;
+use spatialos_sdk::worker::component::{ComponentId, UpdateParameters};
 use spatialos_sdk::worker::connection::*;
 use spatialos_sdk::worker::op::*;
-use std::marker::PhantomData;
-use std::collections::HashMap;
 use spatialos_sdk::worker::*;
+use spatialos_sdk::worker::*;
+use specs::prelude::*;
 use specs::world::*;
-use spatialos_sdk::worker::component::{UpdateParameters, ComponentId};
-use spatialos_sdk::worker::component::VTable;
+use std::collections::HashMap;
 use std::fmt::Debug;
-use crate::*;
-use crate::storage::*;
-use crate::component_registry::*;
-use spatialos_sdk::worker::*;
+use std::marker::PhantomData;
 
 pub struct SpatialReader {
-    spatial_to_specs_entity: HashMap<EntityId, Entity>
+    spatial_to_specs_entity: HashMap<EntityId, Entity>,
 }
 
 impl SpatialReader {
-	pub fn new() -> SpatialReader {
-		SpatialReader {
-			spatial_to_specs_entity: HashMap::new()
-		}
-	}
+    pub fn new() -> SpatialReader {
+        SpatialReader {
+            spatial_to_specs_entity: HashMap::new(),
+        }
+    }
 
     pub fn setup(res: &mut Resources) {
         WriteStorage::<WrappedEntityId>::setup(res);
     }
 
-	pub fn process(&mut self, res: &Resources) {
+    pub fn process(&mut self, res: &Resources) {
         let mut connection = res.fetch_mut::<WorkerConnection>();
-		let ops = connection.get_op_list(0);
+        let ops = connection.get_op_list(0);
 
         for op in &ops {
             match op {
-            	WorkerOp::AddEntity(add_entity_op) => {
+                WorkerOp::AddEntity(add_entity_op) => {
                     let entity = res.fetch_mut::<EntitiesRes>().create();
                     let mut entity_id_storage = WriteStorage::<WrappedEntityId>::fetch(res);
                     entity_id_storage.insert(entity, WrappedEntityId(add_entity_op.entity_id));
 
-                    self.spatial_to_specs_entity.insert(add_entity_op.entity_id, entity);
+                    self.spatial_to_specs_entity
+                        .insert(add_entity_op.entity_id, entity);
                 }
 
-            	WorkerOp::AddComponent(add_component) => {
-                    match res.fetch::<ComponentRegistry>().get_interface(add_component.component_id) {
-                    	None => {},
-                    	Some(interface) => {
-                    		let entity = self.spatial_to_specs_entity[&add_component.entity_id];
-                    		interface.add_component_to_world(res, entity, add_component);
-                    	}
+                WorkerOp::AddComponent(add_component) => {
+                    match res
+                        .fetch::<ComponentRegistry>()
+                        .get_interface(add_component.component_id)
+                    {
+                        None => {}
+                        Some(interface) => {
+                            let entity = self.spatial_to_specs_entity[&add_component.entity_id];
+                            interface.add_component_to_world(res, entity, add_component);
+                        }
                     }
-                },
+                }
                 WorkerOp::ComponentUpdate(update) => {
-                    match res.fetch::<ComponentRegistry>().get_interface(update.component_id) {
-                        None => {},
+                    match res
+                        .fetch::<ComponentRegistry>()
+                        .get_interface(update.component_id)
+                    {
+                        None => {}
                         Some(interface) => {
                             let entity = self.spatial_to_specs_entity[&update.entity_id];
                             interface.apply_component_update(res, entity, update);
                         }
                     }
-                },
+                }
                 WorkerOp::AuthorityChange(authority_change) => {
-                    match res.fetch::<ComponentRegistry>().get_interface(authority_change.component_id) {
-                        None => {},
+                    match res
+                        .fetch::<ComponentRegistry>()
+                        .get_interface(authority_change.component_id)
+                    {
+                        None => {}
                         Some(interface) => {
                             let entity = self.spatial_to_specs_entity[&authority_change.entity_id];
                             interface.apply_authority_change(res, entity, authority_change);
@@ -73,7 +83,7 @@ impl SpatialReader {
                 _ => {}
             }
         }
-	}
+    }
 }
 
 pub struct SpatialReaderSystemData;
@@ -85,15 +95,14 @@ impl<'a> SystemData<'a> for SpatialReaderSystemData {
     }
 
     fn fetch(res: &'a Resources) -> Self {
-        res.fetch_mut::<SpatialReader>()
-            .process(res);
-        SpatialReaderSystemData{}
+        res.fetch_mut::<SpatialReader>().process(res);
+        SpatialReaderSystemData {}
     }
 
     fn reads() -> Vec<ResourceId> {
         vec![
             ResourceId::new::<SpatialReader>(),
-            ResourceId::new::<WorkerConnection>()
+            ResourceId::new::<WorkerConnection>(),
         ]
     }
 
@@ -101,7 +110,7 @@ impl<'a> SystemData<'a> for SpatialReaderSystemData {
     fn writes() -> Vec<ResourceId> {
         vec![
             ResourceId::new::<SpatialReader>(),
-            ResourceId::new::<WorkerConnection>()
+            ResourceId::new::<WorkerConnection>(),
         ]
     }
 }
@@ -110,7 +119,5 @@ pub struct SpatialReaderSystem;
 impl<'a> System<'a> for SpatialReaderSystem {
     type SystemData = SpatialReaderSystemData;
 
-    fn run(&mut self, _: SpatialReaderSystemData) {
-
-    }
+    fn run(&mut self, _: SpatialReaderSystemData) {}
 }

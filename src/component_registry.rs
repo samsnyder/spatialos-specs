@@ -1,27 +1,26 @@
+use crate::storage::*;
+use crate::*;
 use spatialos_sdk::worker::component::Component as SpatialComponent;
-use specs::prelude::*;
+use spatialos_sdk::worker::component::VTable;
+use spatialos_sdk::worker::component::{ComponentId, UpdateParameters};
 use spatialos_sdk::worker::connection::*;
 use spatialos_sdk::worker::op::*;
-use std::marker::PhantomData;
-use std::collections::HashMap;
 use spatialos_sdk::worker::*;
+use spatialos_sdk::worker::*;
+use specs::prelude::*;
 use specs::world::*;
-use spatialos_sdk::worker::component::{UpdateParameters, ComponentId};
-use spatialos_sdk::worker::component::VTable;
+use std::collections::HashMap;
 use std::fmt::Debug;
-use spatialos_sdk::worker::*;
-use crate::*;
-use crate::storage::*;
-
+use std::marker::PhantomData;
 
 pub(crate) struct ComponentRegistry {
-    interfaces: HashMap<ComponentId, Box<ComponentDispatcherInterface + Send + Sync>>
+    interfaces: HashMap<ComponentId, Box<ComponentDispatcherInterface + Send + Sync>>,
 }
 
 impl ComponentRegistry {
     fn new() -> ComponentRegistry {
         ComponentRegistry {
-            interfaces: HashMap::new()
+            interfaces: HashMap::new(),
         }
     }
 
@@ -33,49 +32,87 @@ impl ComponentRegistry {
     }
 
     fn register_component_on_self<C: 'static + SpatialComponent>(&mut self) {
-        let interface = ComponentDispatcher::<C>{
-            _phantom: PhantomData
+        let interface = ComponentDispatcher::<C> {
+            _phantom: PhantomData,
         };
         self.interfaces.insert(C::ID, Box::new(interface));
     }
 
-    pub(crate) fn get_interface(&self, component_id: ComponentId) -> Option<&Box<ComponentDispatcherInterface + Send + Sync>> {
+    pub(crate) fn get_interface(
+        &self,
+        component_id: ComponentId,
+    ) -> Option<&Box<ComponentDispatcherInterface + Send + Sync>> {
         self.interfaces.get(&component_id)
     }
 
-    pub(crate) fn interfaces_iter(&self) -> impl Iterator<Item = &Box<ComponentDispatcherInterface + Send + Sync>> {
+    pub(crate) fn interfaces_iter(
+        &self,
+    ) -> impl Iterator<Item = &Box<ComponentDispatcherInterface + Send + Sync>> {
         self.interfaces.values()
     }
 }
 
 struct ComponentDispatcher<C: 'static + SpatialComponent + Sync + Send + Clone + Debug> {
-	_phantom: PhantomData<C>
+    _phantom: PhantomData<C>,
 }
 
 pub(crate) trait ComponentDispatcherInterface {
-	fn add_component_to_world<'b>(&self, res: &Resources, entity: Entity, add_component: AddComponentOp);
-    fn apply_component_update<'b>(&self, res: &Resources, entity: Entity, component_update: ComponentUpdateOp);
-    fn apply_authority_change<'b>(&self, res: &Resources, entity: Entity, authority_change: AuthorityChangeOp);
+    fn add_component_to_world<'b>(
+        &self,
+        res: &Resources,
+        entity: Entity,
+        add_component: AddComponentOp,
+    );
+    fn apply_component_update<'b>(
+        &self,
+        res: &Resources,
+        entity: Entity,
+        component_update: ComponentUpdateOp,
+    );
+    fn apply_authority_change<'b>(
+        &self,
+        res: &Resources,
+        entity: Entity,
+        authority_change: AuthorityChangeOp,
+    );
     fn replicate(&self, res: &Resources, connection: &mut WorkerConnection);
 }
 
-impl<T: 'static + SpatialComponent + Sync + Send + Clone + Debug> ComponentDispatcherInterface for ComponentDispatcher<T> {
-	fn add_component_to_world<'b>(&self, res: &Resources, entity: Entity, add_component: AddComponentOp) {
-		let mut storage: SpatialWriteStorage<T> = SpatialStorage::fetch(res);
-		let data = add_component.get::<T>().unwrap().clone();
+impl<T: 'static + SpatialComponent + Sync + Send + Clone + Debug> ComponentDispatcherInterface
+    for ComponentDispatcher<T>
+{
+    fn add_component_to_world<'b>(
+        &self,
+        res: &Resources,
+        entity: Entity,
+        add_component: AddComponentOp,
+    ) {
+        let mut storage: SpatialWriteStorage<T> = SpatialStorage::fetch(res);
+        let data = add_component.get::<T>().unwrap().clone();
 
-		storage.insert(entity, SynchronisedComponent::new(data));
-	}
+        storage.insert(entity, SynchronisedComponent::new(data));
+    }
 
-    fn apply_component_update<'b>(&self, res: &Resources, entity: Entity, component_update: ComponentUpdateOp) {
+    fn apply_component_update<'b>(
+        &self,
+        res: &Resources,
+        entity: Entity,
+        component_update: ComponentUpdateOp,
+    ) {
         let mut storage: SpatialWriteStorage<T> = SpatialStorage::fetch(res);
         let update = component_update.get::<T>().unwrap().clone();
 
         storage.get_mut(entity).unwrap().apply_update(update);
     }
 
-    fn apply_authority_change<'b>(&self, res: &Resources, entity: Entity, authority_change: AuthorityChangeOp) {
-        res.fetch_mut::<AuthorityBitSet<T>>().set_authority(entity, authority_change.authority);
+    fn apply_authority_change<'b>(
+        &self,
+        res: &Resources,
+        entity: Entity,
+        authority_change: AuthorityChangeOp,
+    ) {
+        res.fetch_mut::<AuthorityBitSet<T>>()
+            .set_authority(entity, authority_change.authority);
     }
 
     fn replicate(&self, res: &Resources, connection: &mut WorkerConnection) {

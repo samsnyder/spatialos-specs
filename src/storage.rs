@@ -1,7 +1,7 @@
-use specs::prelude::*;
-use specs::world::*;
-use specs::storage::*;
 use spatialos_sdk::worker::component::Component as SpatialComponent;
+use specs::prelude::*;
+use specs::storage::*;
+use specs::world::*;
 
 use std::{
     self,
@@ -9,16 +9,17 @@ use std::{
     ops::{Deref, DerefMut, Not},
 };
 
-use hibitset::{BitSet, BitSetLike, BitSetAnd, BitSetNot};
+use hibitset::{BitSet, BitSetAnd, BitSetLike, BitSetNot};
 use specs::shred::{CastFrom, Fetch, FetchMut, ResourceId};
 
 use specs::join::BitAnd;
 
-use crate::*;
-use crate::spatial_reader::*;
 use crate::component_registry::*;
+use crate::spatial_reader::*;
+use crate::*;
 
-pub type SpatialReadStorage<'a, T> = SpatialStorage<'a, T, Fetch<'a, MaskedStorage<SynchronisedComponent<T>>>>;
+pub type SpatialReadStorage<'a, T> =
+    SpatialStorage<'a, T, Fetch<'a, MaskedStorage<SynchronisedComponent<T>>>>;
 
 impl<'a, T> SystemData<'a> for SpatialReadStorage<'a, T>
 where
@@ -30,7 +31,7 @@ where
     }
 
     fn fetch(res: &'a Resources) -> Self {
-    	SpatialStorage::new(res.fetch(), res.fetch(), res.fetch())
+        SpatialStorage::new(res.fetch(), res.fetch(), res.fetch())
     }
 
     fn reads() -> Vec<ResourceId> {
@@ -42,8 +43,8 @@ where
     }
 }
 
-
-pub type SpatialWriteStorage<'a, T> = SpatialStorage<'a, T, FetchMut<'a, MaskedStorage<SynchronisedComponent<T>>>>;
+pub type SpatialWriteStorage<'a, T> =
+    SpatialStorage<'a, T, FetchMut<'a, MaskedStorage<SynchronisedComponent<T>>>>;
 
 impl<'a, T> SystemData<'a> for SpatialWriteStorage<'a, T>
 where
@@ -55,7 +56,7 @@ where
     }
 
     fn fetch(res: &'a Resources) -> Self {
-    	SpatialStorage::new(res.fetch(), res.fetch_mut(), res.fetch())
+        SpatialStorage::new(res.fetch(), res.fetch_mut(), res.fetch())
     }
 
     fn reads() -> Vec<ResourceId> {
@@ -67,22 +68,31 @@ where
     }
 }
 
-
 /// A wrapper around the masked SpatialStorage and the generations vector.
 /// Can be used for safe lookup of components, insertions and removes.
 /// This is what `World::read/write` fetches for the user.
-pub struct SpatialStorage<'e, T, D> where T: 'static + SpatialComponent {
+pub struct SpatialStorage<'e, T, D>
+where
+    T: 'static + SpatialComponent,
+{
     storage: Storage<'e, SynchronisedComponent<T>, D>,
-    authority: Fetch<'e, AuthorityBitSet<T>>
+    authority: Fetch<'e, AuthorityBitSet<T>>,
 }
 
-impl<'e, T, D> SpatialStorage<'e, T, D> where T: 'static + SpatialComponent {
+impl<'e, T, D> SpatialStorage<'e, T, D>
+where
+    T: 'static + SpatialComponent,
+{
     /// Creates a new `SpatialStorage` from a fetched allocator and a immutable or
     /// mutable `MaskedStorage`, named `data`.
-    pub(crate) fn new(entities: Fetch<'e, EntitiesRes>, data: D, authority: Fetch<'e, AuthorityBitSet<T>>) -> SpatialStorage<'e, T, D> {
+    pub(crate) fn new(
+        entities: Fetch<'e, EntitiesRes>,
+        data: D,
+        authority: Fetch<'e, AuthorityBitSet<T>>,
+    ) -> SpatialStorage<'e, T, D> {
         SpatialStorage {
             storage: Storage::new(entities, data),
-            authority
+            authority,
         }
     }
 }
@@ -147,7 +157,9 @@ where
     /// This is unsafe because modifying the wrapped SpatialStorage without also
     /// updating the mask bitset accordingly can result in illegal memory
     /// access.
-    pub unsafe fn unprotected_storage_mut(&mut self) -> &mut <SynchronisedComponent<T> as Component>::Storage {
+    pub unsafe fn unprotected_storage_mut(
+        &mut self,
+    ) -> &mut <SynchronisedComponent<T> as Component>::Storage {
         self.storage.unprotected_storage_mut()
     }
 
@@ -162,7 +174,11 @@ where
     /// If a component already existed for the given `Entity`, then it will
     /// be overwritten with the new component. If it did overwrite, then the
     /// result will contain `Some(T)` where `T` is the previous component.
-    pub fn insert(&mut self, e: Entity, mut v: SynchronisedComponent<T>) -> InsertResult<SynchronisedComponent<T>> {
+    pub fn insert(
+        &mut self,
+        e: Entity,
+        mut v: SynchronisedComponent<T>,
+    ) -> InsertResult<SynchronisedComponent<T>> {
         self.storage.insert(e, v)
     }
 
@@ -246,7 +262,7 @@ where
 
     // SAFETY: No unsafe code and no invariants to fulfill.
     unsafe fn open(self) -> (Self::Mask, Self::Value) {
-    	let storage = &mut self.storage;
+        let storage = &mut self.storage;
         let (mask, value) = storage.open();
         ((&self.authority.mask, mask).and(), value)
     }
