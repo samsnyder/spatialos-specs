@@ -13,7 +13,8 @@ use hibitset::{BitSet, BitSetLike, BitSetNot};
 use specs::shred::{CastFrom, Fetch, FetchMut, ResourceId};
 
 use crate::*;
-use crate::world::*;
+use crate::spatial_reader::*;
+use crate::component_registry::*;
 
 pub type SpatialReadStorage<'a, T> = SpatialStorage<'a, SynchronisedComponent<T>, Fetch<'a, MaskedStorage<SynchronisedComponent<T>>>>;
 
@@ -22,7 +23,7 @@ where
     T: 'static + SpatialComponent,
 {
     fn setup(res: &mut Resources) {
-        WorldReader::register_component::<T>(res);
+        ComponentRegistry::register_component::<T>(res);
         ReadStorage::<'a, SynchronisedComponent<T>>::setup(res);
     }
 
@@ -47,7 +48,7 @@ where
     T: 'static + SpatialComponent,
 {
     fn setup(res: &mut Resources) {
-        WorldReader::register_component::<T>(res);
+        ComponentRegistry::register_component::<T>(res);
         WriteStorage::<'a, SynchronisedComponent<T>>::setup(res);
     }
 

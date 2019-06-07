@@ -5,14 +5,15 @@ use spatialos_sdk::worker::op::*;
 use std::marker::PhantomData;
 use std::collections::HashMap;
 use spatialos_sdk::worker::*;
-use specs::world::Index;
+use specs::world::*;
 use spatialos_sdk::worker::component::{UpdateParameters, ComponentId};
 use spatialos_sdk::worker::component::VTable;
 use std::fmt::Debug;
 use crate::*;
 use crate::storage::*;
 
-struct ComponentRegistry {
+
+pub(crate) struct ComponentRegistry {
     interfaces: HashMap<ComponentId, Box<ComponentDispatcherInterface + Send + Sync>>
 }
 
@@ -23,18 +24,24 @@ impl ComponentRegistry {
         }
     }
 
-    fn register_component<C: 'static + SpatialComponent>(&mut self) {
+    pub(crate) fn register_component<C: 'static + SpatialComponent>(res: &mut Resources) {
+        res.entry::<ComponentRegistry>()
+            .or_insert_with(|| ComponentRegistry::new())
+            .register_component_on_self::<C>();
+    }
+
+    fn register_component_on_self<C: 'static + SpatialComponent>(&mut self) {
         let interface = ComponentDispatcher::<C>{
             _phantom: PhantomData
         };
         self.interfaces.insert(C::ID, Box::new(interface));
     }
 
-    fn get_interface(&self, component_id: ComponentId) -> Option<&Box<ComponentDispatcherInterface + Send + Sync>> {
+    pub(crate) fn get_interface(&self, component_id: ComponentId) -> Option<&Box<ComponentDispatcherInterface + Send + Sync>> {
         self.interfaces.get(&component_id)
     }
 
-    fn interfaces_iter(&self) -> impl Iterator<Item = &Box<ComponentDispatcherInterface + Send + Sync>> {
+    pub(crate) fn interfaces_iter(&self) -> impl Iterator<Item = &Box<ComponentDispatcherInterface + Send + Sync>> {
         self.interfaces.values()
     }
 }
@@ -43,7 +50,7 @@ struct ComponentDispatcher<C: 'static + SpatialComponent + Sync + Send + Clone +
 	_phantom: PhantomData<C>
 }
 
-trait ComponentDispatcherInterface {
+pub(crate) trait ComponentDispatcherInterface {
 	fn add_component_to_world<'b>(&self, res: &Resources, entity: Entity, add_component: AddComponentOp);
     fn apply_component_update<'b>(&self, res: &Resources, entity: Entity, component_update: ComponentUpdateOp);
     fn replicate(&self, res: &Resources, connection: &mut WorkerConnection);
@@ -76,69 +83,6 @@ impl<T: 'static + SpatialComponent + Sync + Send + Clone + Debug> ComponentDispa
                     UpdateParameters::default(),
                 );
             }
-        }
-    }
-}
-
-pub struct WorldReader {
-	spatial_to_specs_entity: HashMap<EntityId, Entity>,
-    connection: WorkerConnection
-}
-
-impl WorldReader {
-	pub fn new(connection: WorkerConnection) -> WorldReader {
-		WorldReader {
-			spatial_to_specs_entity: HashMap::new(),
-            connection
-		}
-	}
-
-    pub fn setup(&self, world: &mut World) {
-        world.register::<WrappedEntityId>();
-    }
-
-    pub fn register_component<C: 'static + SpatialComponent>(res: &mut Resources) {
-        res.entry::<ComponentRegistry>()
-            .or_insert_with(|| ComponentRegistry::new())
-            .register_component::<C>();
-    }
-
-	pub fn process(&mut self, world: &mut World) {
-		let ops = self.connection.get_op_list(0);
-
-        for op in &ops {
-            match op {
-            	WorkerOp::AddEntity(add_entity_op) => {
-                    let entity = world.create_entity().with(WrappedEntityId(add_entity_op.entity_id)).build();
-                    self.spatial_to_specs_entity.insert(add_entity_op.entity_id, entity);
-                }
-
-            	WorkerOp::AddComponent(add_component) => {
-                    match world.res.fetch::<ComponentRegistry>().get_interface(add_component.component_id) {
-                    	None => {},
-                    	Some(interface) => {
-                    		let entity = self.spatial_to_specs_entity[&add_component.entity_id];
-                    		interface.add_component_to_world(&world.res, entity, add_component);
-                    	}
-                    }
-                },
-                WorkerOp::ComponentUpdate(update) => {
-                    match world.res.fetch::<ComponentRegistry>().get_interface(update.component_id) {
-                        None => {},
-                        Some(interface) => {
-                            let entity = self.spatial_to_specs_entity[&update.entity_id];
-                            interface.apply_component_update(&world.res, entity, update);
-                        }
-                    }
-                },
-                _ => {}
-            }
-        }
-	}
-
-    pub fn replicate(&mut self, res: &Resources) {
-        for interface in res.fetch::<ComponentRegistry>().interfaces_iter() {
-            interface.replicate(&res, &mut self.connection);
         }
     }
 }

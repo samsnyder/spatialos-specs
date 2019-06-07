@@ -10,8 +10,10 @@ use std::fmt::Debug;
 use spatialos_sdk::worker::EntityId;
 use spatialos_sdk::worker::internal::schema::SchemaComponentUpdate;
 
-pub mod world;
+pub mod spatial_reader;
+pub mod spatial_writer;
 pub mod storage;
+mod component_registry;
 
 #[derive(Debug)]
 pub struct SynchronisedComponent<T: SpatialComponent + Debug> {
