@@ -1,12 +1,11 @@
 use crate::storage::*;
+use crate::commands::*;
 use crate::*;
 use spatialos_sdk::worker::component::Component as SpatialComponent;
 use spatialos_sdk::worker::component::VTable;
 use spatialos_sdk::worker::component::{ComponentId, UpdateParameters};
 use spatialos_sdk::worker::connection::*;
 use spatialos_sdk::worker::op::*;
-use spatialos_sdk::worker::*;
-use spatialos_sdk::worker::*;
 use specs::prelude::*;
 use specs::world::*;
 use std::collections::HashMap;
@@ -25,9 +24,16 @@ impl ComponentRegistry {
     }
 
     pub(crate) fn register_component<C: 'static + SpatialComponent>(res: &mut Resources) {
+        // Create component data storage.
+        WriteStorage::<SynchronisedComponent<C>>::setup(res);
+
+        // Create command sender resource.
+        Write::<CommandSenderImpl<C>>::setup(res);
+
         res.entry::<ComponentRegistry>()
             .or_insert_with(|| ComponentRegistry::new())
             .register_component_on_self::<C>();
+
         res.insert(AuthorityBitSet::<C>::new());
     }
 
@@ -80,6 +86,18 @@ pub(crate) trait ComponentDispatcherInterface {
         entity: Entity,
         authority_change: AuthorityChangeOp,
     );
+    fn on_command_request<'b>(
+        &self,
+        res: &Resources,
+        entity: Entity,
+        command_request: CommandRequestOp,
+    );
+    fn on_command_response<'b>(
+        &self,
+        res: &Resources,
+        entity: Entity,
+        command_response: CommandResponseOp,
+    );
     fn replicate(&self, res: &Resources, connection: &mut WorkerConnection);
 }
 
@@ -129,8 +147,28 @@ impl<T: 'static + SpatialComponent + Sync + Send + Clone + Debug> ComponentDispa
             .set_authority(entity, authority_change.authority);
     }
 
+    fn on_command_request<'b>(
+        &self,
+        res: &Resources,
+        entity: Entity,
+        command_request: CommandRequestOp,
+    ) {
+        // let mut storage = WriteStorage::<CommandResponder<T>>::fetch(res);
+        // let request = command_request.get::<T>().unwrap().clone();
+        // storage.get_mut(entity).unwrap().on_request(command_request.request_id, request);
+    }
+
+    fn on_command_response<'b>(
+        &self,
+        res: &Resources,
+        entity: Entity,
+        command_response: CommandResponseOp,
+    ) {
+        CommandSender::<T>::fetch(res).got_command_response(res, command_response);
+    }
+
     fn replicate(&self, res: &Resources, connection: &mut WorkerConnection) {
-        let entity_ids: ReadStorage<WrappedEntityId> = Storage::fetch(res);
+        let entity_ids: ReadStorage<EntityId> = Storage::fetch(res);
         let mut storage: SpatialWriteStorage<T> = SpatialStorage::fetch(res);
 
         for (entity_id, component) in (&entity_ids, &mut storage).join() {
@@ -142,5 +180,13 @@ impl<T: 'static + SpatialComponent + Sync + Send + Clone + Debug> ComponentDispa
                 );
             }
         }
+
+        // Send queued command requests and responses
+        CommandSender::<T>::fetch(res).flush_requests(connection);
+
+        // let mut responses = CommandRequests::<T>::fetch(res);
+        // for entity in (&mut responses).join() {
+        //     entity.flush_responses(connection);
+        // }
     }
 }

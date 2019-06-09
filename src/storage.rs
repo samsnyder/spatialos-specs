@@ -1,4 +1,5 @@
 use spatialos_sdk::worker::component::Component as SpatialComponent;
+use spatialos_sdk::worker::Authority;
 use specs::prelude::*;
 use specs::storage::*;
 use specs::world::*;
@@ -17,6 +18,7 @@ use specs::join::BitAnd;
 use crate::component_registry::*;
 use crate::spatial_reader::*;
 use crate::*;
+use crate::commands::*;
 
 pub type SpatialReadStorage<'a, T> =
     SpatialStorage<'a, T, Fetch<'a, MaskedStorage<SynchronisedComponent<T>>>>;
@@ -27,7 +29,6 @@ where
 {
     fn setup(res: &mut Resources) {
         ComponentRegistry::register_component::<T>(res);
-        ReadStorage::<'a, SynchronisedComponent<T>>::setup(res);
     }
 
     fn fetch(res: &'a Resources) -> Self {
@@ -52,7 +53,6 @@ where
 {
     fn setup(res: &mut Resources) {
         ComponentRegistry::register_component::<T>(res);
-        WriteStorage::<'a, SynchronisedComponent<T>>::setup(res);
     }
 
     fn fetch(res: &'a Resources) -> Self {
@@ -67,6 +67,30 @@ where
         WriteStorage::<'a, SynchronisedComponent<T>>::writes()
     }
 }
+
+
+pub(crate) struct AuthorityBitSet<T: SpatialComponent> {
+    mask: BitSet,
+    _phantom: PhantomData<T>,
+}
+
+impl<T: SpatialComponent> AuthorityBitSet<T> {
+    pub fn new() -> AuthorityBitSet<T> {
+        AuthorityBitSet {
+            mask: BitSet::new(),
+            _phantom: PhantomData,
+        }
+    }
+
+    pub fn set_authority(&mut self, e: Entity, authority: Authority) {
+        if authority == Authority::NotAuthoritative {
+            self.mask.remove(e.id());
+        } else {
+            self.mask.add(e.id());
+        }
+    }
+}
+
 
 /// A wrapper around the masked SpatialStorage and the generations vector.
 /// Can be used for safe lookup of components, insertions and removes.

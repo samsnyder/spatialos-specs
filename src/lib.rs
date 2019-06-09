@@ -2,19 +2,20 @@ use spatialos_sdk::worker::component::Component as SpatialComponent;
 use spatialos_sdk::worker::component::TypeConversion;
 use spatialos_sdk::worker::internal::schema::SchemaComponentUpdate;
 use spatialos_sdk::worker::op::*;
-use spatialos_sdk::worker::EntityId;
-use spatialos_sdk::worker::*;
+use spatialos_sdk::worker::EntityId as SpatialEntityId;
 use specs::prelude::*;
-use specs::shred::{Fetch, Resource, ResourceId, SystemData};
+use specs::shred::{DefaultProvider, Fetch, Resource, ResourceId, SystemData};
 use specs::storage::MaskedStorage;
 use std::fmt::Debug;
 use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
+use crate::component_registry::*;
 
 mod component_registry;
 pub mod spatial_reader;
 pub mod spatial_writer;
 pub mod storage;
+pub mod commands;
 
 #[derive(Debug)]
 pub struct SynchronisedComponent<T: SpatialComponent + Debug> {
@@ -69,30 +70,62 @@ impl<T: 'static + SpatialComponent> Component for SynchronisedComponent<T> {
     type Storage = VecStorage<Self>;
 }
 
-pub(crate) struct WrappedEntityId(EntityId);
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Default)]
+pub struct EntityId(SpatialEntityId);
 
-impl Component for WrappedEntityId {
+impl Component for EntityId {
     type Storage = VecStorage<Self>;
 }
 
-pub(crate) struct AuthorityBitSet<T: SpatialComponent> {
-    mask: BitSet,
-    _phantom: PhantomData<T>,
+
+
+pub struct WriteAndRegisterComponent<'a, T: 'a + Resource, C: SpatialComponent> {
+    resource: Write<'a, T>,
+    phantom: PhantomData<C>
 }
 
-impl<T: SpatialComponent> AuthorityBitSet<T> {
-    pub fn new() -> AuthorityBitSet<T> {
-        AuthorityBitSet {
-            mask: BitSet::new(),
-            _phantom: PhantomData,
+impl<'a, T, C: SpatialComponent> Deref for WriteAndRegisterComponent<'a, T, C>
+where
+    T: Resource,
+{
+    type Target = T;
+
+    fn deref(&self) -> &T {
+        self.resource.deref()
+    }
+}
+
+impl<'a, T, C: SpatialComponent> DerefMut for WriteAndRegisterComponent<'a, T, C>
+where
+    T: Resource,
+{
+    fn deref_mut(&mut self) -> &mut T {
+        self.resource.deref_mut()
+    }
+}
+
+impl<'a, T, C: SpatialComponent> SystemData<'a> for WriteAndRegisterComponent<'a, T, C>
+where
+    C: 'static + SpatialComponent,
+    T: Resource + Default
+{
+    fn setup(res: &mut Resources) {
+        ComponentRegistry::register_component::<C>(res);
+        Write::<T>::setup(res);
+    }
+
+    fn fetch(res: &'a Resources) -> Self {
+        WriteAndRegisterComponent {
+            resource: Write::fetch(res),
+            phantom: PhantomData
         }
     }
 
-    pub fn set_authority(&mut self, e: Entity, authority: Authority) {
-        if authority == Authority::NotAuthoritative {
-            self.mask.remove(e.id());
-        } else {
-            self.mask.add(e.id());
-        }
+    fn reads() -> Vec<ResourceId> {
+        Write::<T>::reads()
+    }
+
+    fn writes() -> Vec<ResourceId> {
+        Write::<T>::writes()
     }
 }

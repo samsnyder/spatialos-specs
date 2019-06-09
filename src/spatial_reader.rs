@@ -6,8 +6,6 @@ use spatialos_sdk::worker::component::VTable;
 use spatialos_sdk::worker::component::{ComponentId, UpdateParameters};
 use spatialos_sdk::worker::connection::*;
 use spatialos_sdk::worker::op::*;
-use spatialos_sdk::worker::*;
-use spatialos_sdk::worker::*;
 use specs::prelude::*;
 use specs::world::*;
 use std::collections::HashMap;
@@ -26,7 +24,7 @@ impl SpatialReader {
     }
 
     pub fn setup(res: &mut Resources) {
-        WriteStorage::<WrappedEntityId>::setup(res);
+        WriteStorage::<EntityId>::setup(res);
     }
 
     pub fn process(&mut self, res: &Resources) {
@@ -34,17 +32,18 @@ impl SpatialReader {
         let ops = connection.get_op_list(0);
 
         for op in &ops {
+            println!("{:?}", op);
             match op {
                 WorkerOp::AddEntity(add_entity_op) => {
                     let entity = res.fetch_mut::<EntitiesRes>().create();
-                    let mut entity_id_storage = WriteStorage::<WrappedEntityId>::fetch(res);
-                    entity_id_storage.insert(entity, WrappedEntityId(add_entity_op.entity_id)).unwrap();
+                    let mut entity_id_storage = WriteStorage::<EntityId>::fetch(res);
+                    entity_id_storage.insert(entity, EntityId(add_entity_op.entity_id)).unwrap();
 
                     self.spatial_to_specs_entity
-                        .insert(add_entity_op.entity_id, entity);
+                        .insert(EntityId(add_entity_op.entity_id), entity);
                 }
                 WorkerOp::RemoveEntity(remove_entity_op) => {
-                    let entity = self.spatial_to_specs_entity[&remove_entity_op.entity_id];
+                    let entity = self.spatial_to_specs_entity[&EntityId(remove_entity_op.entity_id)];
                     res.fetch_mut::<EntitiesRes>().delete(entity);
                 }
                 WorkerOp::AddComponent(add_component) => {
@@ -54,7 +53,7 @@ impl SpatialReader {
                     {
                         None => {}
                         Some(interface) => {
-                            let entity = self.spatial_to_specs_entity[&add_component.entity_id];
+                            let entity = self.spatial_to_specs_entity[&EntityId(add_component.entity_id)];
                             interface.add_component(res, entity, add_component);
                         }
                     }
@@ -66,7 +65,7 @@ impl SpatialReader {
                     {
                         None => {}
                         Some(interface) => {
-                            let entity = self.spatial_to_specs_entity[&remove_component.entity_id];
+                            let entity = self.spatial_to_specs_entity[&EntityId(remove_component.entity_id)];
                             interface.remove_component(res, entity);
                         }
                     }
@@ -78,7 +77,7 @@ impl SpatialReader {
                     {
                         None => {}
                         Some(interface) => {
-                            let entity = self.spatial_to_specs_entity[&update.entity_id];
+                            let entity = self.spatial_to_specs_entity[&EntityId(update.entity_id)];
                             interface.apply_component_update(res, entity, update);
                         }
                     }
@@ -90,8 +89,33 @@ impl SpatialReader {
                     {
                         None => {}
                         Some(interface) => {
-                            let entity = self.spatial_to_specs_entity[&authority_change.entity_id];
+                            let entity = self.spatial_to_specs_entity[&EntityId(authority_change.entity_id)];
                             interface.apply_authority_change(res, entity, authority_change);
+                        }
+                    }
+                },
+                WorkerOp::CommandRequest(command_request) => {
+                    match res
+                        .fetch::<ComponentRegistry>()
+                        .get_interface(command_request.component_id)
+                    {
+                        None => {}
+                        Some(interface) => {
+                            let entity = self.spatial_to_specs_entity[&EntityId(command_request.entity_id)];
+                            interface.on_command_request(res, entity, command_request);
+                        }
+                    }
+                }
+                _ => {}
+                WorkerOp::CommandResponse(command_response) => {
+                    match res
+                        .fetch::<ComponentRegistry>()
+                        .get_interface(command_response.component_id)
+                    {
+                        None => {}
+                        Some(interface) => {
+                            let entity = self.spatial_to_specs_entity[&EntityId(command_response.entity_id)];
+                            interface.on_command_response(res, entity, command_response);
                         }
                     }
                 }
