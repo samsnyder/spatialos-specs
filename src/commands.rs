@@ -62,23 +62,22 @@ pub struct CommandSenderImpl<T: SpatialComponent> {
 }
 
 impl<T: 'static + SpatialComponent> CommandSenderImpl<T> {
-	pub fn send_command<F, G>(&mut self, 
+	pub fn send_command<'a, F, S>(&mut self, 
 			entity_id: EntityId,
 			request: T::CommandRequest,
-			success: F,
-			failure: G) 
+			callback: F) 
 	where 
-		F: 'static + FnOnce(&Resources, &T::CommandResponse) + Send + Sync,
-		G: 'static + FnOnce(StatusCode<CommandResponse>) + Send + Sync
+		S: SystemData<'a>,
+		F: 'static + FnOnce(&Resources, Result<&T::CommandResponse, StatusCode<CommandResponse>>) + Send + Sync
 	{
 		self.buffered_requests.push((entity_id, request, Box::new(|res: &Resources, response_op| {
 			match response_op.response {
 				StatusCode::Success(response) => {
 					let response = response.get::<T>().unwrap();
-					success(res, response);
+					callback(res, Ok(response));
 				},
 				other => {
-					failure(other);
+					callback(res, Err(other));
 				}
 			}
 		})));
