@@ -85,20 +85,22 @@ impl<'a, T: 'static + SpatialComponent> CommandRequestsExt for CommandRequests<'
 
 pub type CommandSender<'a, T> = WriteAndRegisterComponent<'a, CommandSenderImpl<T>, T>;
 
+type CommandIntermediateCallback = Box<FnOnce(&Resources, CommandResponseOp) + Send + Sync>;
+
 pub struct CommandSenderImpl<T: SpatialComponent> {
-	callbacks: HashMap<RequestId<OutgoingCommandRequest>, Box<FnOnce(&Resources, CommandResponseOp) + Send + Sync>>,
-	buffered_requests: Vec<(SpatialEntity, T::CommandRequest, Box<FnOnce(&Resources, CommandResponseOp) + Send + Sync>)>
+	callbacks: HashMap<RequestId<OutgoingCommandRequest>, CommandIntermediateCallback>,
+	buffered_requests: Vec<(SpatialEntity, T::CommandRequest, CommandIntermediateCallback)>
 }
 
 impl<T: 'static + SpatialComponent> CommandSenderImpl<T> {
-	pub fn send_command<'a, F>(&mut self, 
+	pub fn send_command<F>(&mut self, 
 			entity_id: SpatialEntity,
 			request: T::CommandRequest,
 			callback: F) 
 	where 
 		F: 'static + FnOnce(&Resources, Result<&T::CommandResponse, StatusCode<CommandResponse>>) + Send + Sync
 	{
-		self.buffered_requests.push((entity_id, request, Box::new(|res: &Resources, response_op| {
+		self.buffered_requests.push((entity_id, request, Box::new(|res, response_op| {
 			match response_op.response {
 				StatusCode::Success(response) => {
 					let response = response.get::<T>().unwrap();

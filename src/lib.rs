@@ -17,6 +17,7 @@ pub mod spatial_writer;
 pub mod storage;
 pub mod commands;
 pub mod entities;
+pub mod system_commands;
 
 #[derive(Debug)]
 pub struct SynchronisedComponent<T: SpatialComponent + Debug> {
