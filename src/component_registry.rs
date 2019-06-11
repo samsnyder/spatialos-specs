@@ -11,6 +11,7 @@ use specs::world::*;
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::marker::PhantomData;
+use crate::entities::*;
 
 pub(crate) struct ComponentRegistry {
     interfaces: HashMap<ComponentId, Box<ComponentDispatcherInterface + Send + Sync>>,
@@ -23,25 +24,28 @@ impl ComponentRegistry {
         }
     }
 
-    pub(crate) fn register_component<C: 'static + SpatialComponent>(res: &mut Resources) {
+    pub(crate) fn register_component<T: 'static + SpatialComponent>(res: &mut Resources) {
         // Create component data storage.
-        WriteStorage::<SynchronisedComponent<C>>::setup(res);
+        WriteStorage::<SynchronisedComponent<T>>::setup(res);
 
         // Create command sender resource.
-        Write::<CommandSenderImpl<C>>::setup(res);
+        Write::<CommandSenderImpl<T>>::setup(res);
+
+        // Create command receiver storage.
+        CommandRequests::<T>::setup(res);
 
         res.entry::<ComponentRegistry>()
             .or_insert_with(|| ComponentRegistry::new())
-            .register_component_on_self::<C>();
+            .register_component_on_self::<T>();
 
-        res.insert(AuthorityBitSet::<C>::new());
+        res.insert(AuthorityBitSet::<T>::new());
     }
 
-    fn register_component_on_self<C: 'static + SpatialComponent>(&mut self) {
-        let interface = ComponentDispatcher::<C> {
+    fn register_component_on_self<T: 'static + SpatialComponent>(&mut self) {
+        let interface = ComponentDispatcher::<T> {
             _phantom: PhantomData,
         };
-        self.interfaces.insert(C::ID, Box::new(interface));
+        self.interfaces.insert(T::ID, Box::new(interface));
     }
 
     pub(crate) fn get_interface(
@@ -58,44 +62,44 @@ impl ComponentRegistry {
     }
 }
 
-struct ComponentDispatcher<C: 'static + SpatialComponent + Sync + Send + Clone + Debug> {
-    _phantom: PhantomData<C>,
+struct ComponentDispatcher<T: 'static + SpatialComponent + Sync + Send + Clone + Debug> {
+    _phantom: PhantomData<T>,
 }
 
 pub(crate) trait ComponentDispatcherInterface {
     fn add_component<'b>(
         &self,
         res: &Resources,
-        entity: Entity,
+        entity: SpatialEntity,
         add_component: AddComponentOp,
     );
     fn remove_component<'b>(
         &self,
         res: &Resources,
-        entity: Entity
+        entity: SpatialEntity
     );
     fn apply_component_update<'b>(
         &self,
         res: &Resources,
-        entity: Entity,
+        entity: SpatialEntity,
         component_update: ComponentUpdateOp,
     );
     fn apply_authority_change<'b>(
         &self,
         res: &Resources,
-        entity: Entity,
+        entity: SpatialEntity,
         authority_change: AuthorityChangeOp,
     );
     fn on_command_request<'b>(
         &self,
         res: &Resources,
-        entity: Entity,
+        entity: SpatialEntity,
         command_request: CommandRequestOp,
     );
     fn on_command_response<'b>(
         &self,
         res: &Resources,
-        entity: Entity,
+        entity: SpatialEntity,
         command_response: CommandResponseOp,
     );
     fn replicate(&self, res: &Resources, connection: &mut WorkerConnection);
@@ -107,7 +111,7 @@ impl<T: 'static + SpatialComponent + Sync + Send + Clone + Debug> ComponentDispa
     fn add_component<'b>(
         &self,
         res: &Resources,
-        entity: Entity,
+        entity: SpatialEntity,
         add_component: AddComponentOp,
     ) {
         let mut storage: SpatialWriteStorage<T> = SpatialStorage::fetch(res);
@@ -119,7 +123,7 @@ impl<T: 'static + SpatialComponent + Sync + Send + Clone + Debug> ComponentDispa
     fn remove_component<'b>(
         &self,
         res: &Resources,
-        entity: Entity
+        entity: SpatialEntity
     ) {
         let mut storage: SpatialWriteStorage<T> = SpatialStorage::fetch(res);
         storage.remove(entity);
@@ -128,7 +132,7 @@ impl<T: 'static + SpatialComponent + Sync + Send + Clone + Debug> ComponentDispa
     fn apply_component_update<'b>(
         &self,
         res: &Resources,
-        entity: Entity,
+        entity: SpatialEntity,
         component_update: ComponentUpdateOp,
     ) {
         let mut storage: SpatialWriteStorage<T> = SpatialStorage::fetch(res);
@@ -140,7 +144,7 @@ impl<T: 'static + SpatialComponent + Sync + Send + Clone + Debug> ComponentDispa
     fn apply_authority_change<'b>(
         &self,
         res: &Resources,
-        entity: Entity,
+        entity: SpatialEntity,
         authority_change: AuthorityChangeOp,
     ) {
         res.fetch_mut::<AuthorityBitSet<T>>()
@@ -150,31 +154,39 @@ impl<T: 'static + SpatialComponent + Sync + Send + Clone + Debug> ComponentDispa
     fn on_command_request<'b>(
         &self,
         res: &Resources,
-        entity: Entity,
+        entity: SpatialEntity,
         command_request: CommandRequestOp,
     ) {
-        // let mut storage = WriteStorage::<CommandResponder<T>>::fetch(res);
-        // let request = command_request.get::<T>().unwrap().clone();
-        // storage.get_mut(entity).unwrap().on_request(command_request.request_id, request);
+        let mut command_requests = CommandRequests::<T>::fetch(res);
+        let request = command_request.get::<T>().unwrap().clone();
+
+        match command_requests.get_mut(entity.into()) {
+            Some(requests) => requests.on_request(command_request.request_id, request),
+            None => {
+                let mut requests: CommandResponder<T> = Default::default();
+                requests.on_request(command_request.request_id, request);
+                command_requests.insert(entity.specs_entity(), requests);
+            }
+        }
     }
 
     fn on_command_response<'b>(
         &self,
         res: &Resources,
-        entity: Entity,
+        entity: SpatialEntity,
         command_response: CommandResponseOp,
     ) {
         CommandSender::<T>::fetch(res).got_command_response(res, command_response);
     }
 
     fn replicate(&self, res: &Resources, connection: &mut WorkerConnection) {
-        let entity_ids: ReadStorage<EntityId> = Storage::fetch(res);
+        let entities: ReadStorage<SpatialEntity> = Storage::fetch(res);
         let mut storage: SpatialWriteStorage<T> = SpatialStorage::fetch(res);
 
-        for (entity_id, component) in (&entity_ids, &mut storage).join() {
+        for (entity, component) in (&entities, &mut storage).join() {
             if component.get_and_clear_dity_bit() {
                 connection.send_component_update::<T>(
-                    entity_id.0,
+                    entity.entity_id(),
                     component.to_update(),
                     UpdateParameters::default(),
                 );
@@ -184,9 +196,11 @@ impl<T: 'static + SpatialComponent + Sync + Send + Clone + Debug> ComponentDispa
         // Send queued command requests and responses
         CommandSender::<T>::fetch(res).flush_requests(connection);
 
-        // let mut responses = CommandRequests::<T>::fetch(res);
-        // for entity in (&mut responses).join() {
-        //     entity.flush_responses(connection);
-        // }
+        let mut responses = CommandRequests::<T>::fetch(res);
+        for entity in (&mut responses).join() {
+            entity.flush_responses(connection);
+        }
+
+        responses.clear_empty_request_objects(res);
     }
 }

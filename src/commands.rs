@@ -18,12 +18,22 @@ use specs::shred::FetchMut;
 use crate::*;
 use crate::storage::*;
 use std::collections::HashMap;
+use crate::entities::*;
 
 pub type CommandRequests<'a, T> = WriteStorage<'a, CommandResponder<T>>;
 
 pub struct CommandResponder<T: SpatialComponent> {
 	requests: Vec<(RequestId<IncomingCommandRequest>, T::CommandRequest)>,
 	responses: Vec<(RequestId<IncomingCommandRequest>, T::CommandResponse)>
+}
+
+impl<T: SpatialComponent> Default for CommandResponder<T> {
+	fn default() -> Self {
+		CommandResponder {
+			requests: Vec::new(),
+			responses: Vec::new()
+		}
+	}
 }
 
 impl<T: 'static + SpatialComponent> Component for CommandResponder<T> {
@@ -54,20 +64,38 @@ impl<T: SpatialComponent> CommandResponder<T> {
 	}
 }
 
+pub(crate) trait CommandRequestsExt {
+	fn clear_empty_request_objects(&mut self, res: &Resources);
+}
+
+impl<'a, T: 'static + SpatialComponent> CommandRequestsExt for CommandRequests<'a, T> {
+	fn clear_empty_request_objects(&mut self, res: &Resources) {
+		let non_empty_requests: Vec<(CommandResponder<T>, Entity)> = 
+			(self.drain(), &Entities::fetch(res))
+			.join()
+			.filter(|r| r.0.requests.len() > 0).collect();
+
+		self.clear();
+
+		for (requests, entity) in non_empty_requests {
+			self.insert(entity, requests);
+		}
+	}
+}
+
 pub type CommandSender<'a, T> = WriteAndRegisterComponent<'a, CommandSenderImpl<T>, T>;
 
 pub struct CommandSenderImpl<T: SpatialComponent> {
 	callbacks: HashMap<RequestId<OutgoingCommandRequest>, Box<FnOnce(&Resources, CommandResponseOp) + Send + Sync>>,
-	buffered_requests: Vec<(EntityId, T::CommandRequest, Box<FnOnce(&Resources, CommandResponseOp) + Send + Sync>)>
+	buffered_requests: Vec<(SpatialEntity, T::CommandRequest, Box<FnOnce(&Resources, CommandResponseOp) + Send + Sync>)>
 }
 
 impl<T: 'static + SpatialComponent> CommandSenderImpl<T> {
-	pub fn send_command<'a, F, S>(&mut self, 
-			entity_id: EntityId,
+	pub fn send_command<'a, F>(&mut self, 
+			entity_id: SpatialEntity,
 			request: T::CommandRequest,
 			callback: F) 
 	where 
-		S: SystemData<'a>,
 		F: 'static + FnOnce(&Resources, Result<&T::CommandResponse, StatusCode<CommandResponse>>) + Send + Sync
 	{
 		self.buffered_requests.push((entity_id, request, Box::new(|res: &Resources, response_op| {
@@ -91,9 +119,9 @@ impl<T: 'static + SpatialComponent> CommandSenderImpl<T> {
 	}
 
 	pub(crate) fn flush_requests(&mut self, connection: &mut WorkerConnection) {
-		for (entity_id, request, callback) in self.buffered_requests.drain(..) {
+		for (entity, request, callback) in self.buffered_requests.drain(..) {
 			// TODO: Default command params like timeout
-			let request_id = connection.send_command_request::<T>(entity_id.0, request, None, Default::default());
+			let request_id = connection.send_command_request::<T>(entity.entity_id(), request, None, Default::default());
 			self.callbacks.insert(request_id, callback);
 		}
 	}

@@ -2,7 +2,7 @@ use spatialos_sdk::worker::component::Component as SpatialComponent;
 use spatialos_sdk::worker::component::TypeConversion;
 use spatialos_sdk::worker::internal::schema::SchemaComponentUpdate;
 use spatialos_sdk::worker::op::*;
-use spatialos_sdk::worker::EntityId as SpatialEntityId;
+use spatialos_sdk::worker::EntityId;
 use specs::prelude::*;
 use specs::shred::{DefaultProvider, Fetch, Resource, ResourceId, SystemData};
 use specs::storage::MaskedStorage;
@@ -16,6 +16,7 @@ pub mod spatial_reader;
 pub mod spatial_writer;
 pub mod storage;
 pub mod commands;
+pub mod entities;
 
 #[derive(Debug)]
 pub struct SynchronisedComponent<T: SpatialComponent + Debug> {
@@ -69,15 +70,6 @@ impl<T: SpatialComponent + Debug> DerefMut for SynchronisedComponent<T> {
 impl<T: 'static + SpatialComponent> Component for SynchronisedComponent<T> {
     type Storage = VecStorage<Self>;
 }
-
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Default)]
-pub struct EntityId(SpatialEntityId);
-
-impl Component for EntityId {
-    type Storage = VecStorage<Self>;
-}
-
-
 
 pub struct WriteAndRegisterComponent<'a, T: 'a + Resource, C: SpatialComponent> {
     resource: Write<'a, T>,

@@ -19,6 +19,7 @@ use crate::component_registry::*;
 use crate::spatial_reader::*;
 use crate::*;
 use crate::commands::*;
+use crate::entities::*;
 
 pub type SpatialReadStorage<'a, T> =
     SpatialStorage<'a, T, Fetch<'a, MaskedStorage<SynchronisedComponent<T>>>>;
@@ -82,11 +83,11 @@ impl<T: SpatialComponent> AuthorityBitSet<T> {
         }
     }
 
-    pub fn set_authority(&mut self, e: Entity, authority: Authority) {
+    pub fn set_authority(&mut self, e: SpatialEntity, authority: Authority) {
         if authority == Authority::NotAuthoritative {
-            self.mask.remove(e.id());
+            self.mask.remove(e.specs_entity().id());
         } else {
-            self.mask.add(e.id());
+            self.mask.add(e.specs_entity().id());
         }
     }
 }
@@ -140,8 +141,8 @@ where
     }
 
     /// Tries to read the data associated with an `Entity`.
-    pub fn get(&self, e: Entity) -> Option<&SynchronisedComponent<T>> {
-        self.storage.get(e)
+    pub fn get(&self, e: SpatialEntity) -> Option<&SynchronisedComponent<T>> {
+        self.storage.get(e.specs_entity())
     }
 
     /// Computes the number of elements this `SpatialStorage` contains by counting the
@@ -158,8 +159,8 @@ where
 
     /// Returns true if the SpatialStorage has a component for this entity, and that
     /// entity is alive.
-    pub fn contains(&self, e: Entity) -> bool {
-        self.storage.contains(e)
+    pub fn contains(&self, e: SpatialEntity) -> bool {
+        self.storage.contains(e.specs_entity())
     }
 
     /// Returns a reference to the bitset of this SpatialStorage which allows filtering
@@ -188,8 +189,8 @@ where
     }
 
     /// Tries to mutate the data associated with an `Entity`.
-    pub fn get_mut(&mut self, e: Entity) -> Option<&mut SynchronisedComponent<T>> {
-        self.storage.get_mut(e)
+    pub fn get_mut(&mut self, e: SpatialEntity) -> Option<&mut SynchronisedComponent<T>> {
+        self.storage.get_mut(e.specs_entity())
     }
 
     /// Inserts new data for a given `Entity`.
@@ -200,15 +201,15 @@ where
     /// result will contain `Some(T)` where `T` is the previous component.
     pub fn insert(
         &mut self,
-        e: Entity,
+        e: SpatialEntity,
         v: SynchronisedComponent<T>,
     ) -> InsertResult<SynchronisedComponent<T>> {
-        self.storage.insert(e, v)
+        self.storage.insert(e.specs_entity(), v)
     }
 
     /// Removes the data associated with an `Entity`.
-    pub fn remove(&mut self, e: Entity) -> Option<SynchronisedComponent<T>> {
-        self.storage.remove(e)
+    pub fn remove(&mut self, e: SpatialEntity) -> Option<SynchronisedComponent<T>> {
+        self.storage.remove(e.specs_entity())
     }
 
     /// Clears the contents of the SpatialStorage.
