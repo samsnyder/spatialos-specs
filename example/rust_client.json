@@ -1,0 +1,13 @@
+{
+  "workerType": "RustClient",
+  "layer": "client",
+  "entity_interest": {
+    "range_entity_interest": {
+      "radius": 2
+    }
+  },
+  "componentDelivery": {
+    "default": "RELIABLE_ORDERED",
+    "checkout_all_initially": true
+  }
+}

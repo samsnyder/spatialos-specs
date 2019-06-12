@@ -1,0 +1,21 @@
+package game;
+
+type CreatePlayerRequest {
+    string name = 1;
+}
+
+type CreatePlayerResponse {
+
+}
+
+component PlayerCreator {
+    id = 1001;
+
+    command CreatePlayerResponse create_player(CreatePlayerRequest);
+}
+
+component Player {
+    id = 1002;
+    
+    string name = 1;
+}
