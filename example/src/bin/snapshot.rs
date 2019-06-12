@@ -22,7 +22,7 @@ use std::time::Duration;
 
 use rand::Rng;
 
-use crate::generated::game::*;
+use example::generated::game::*;
 
 fn main() {
     let opt = Opt::from_args();
@@ -35,7 +35,7 @@ fn main() {
     let snapshot_path = path_buf.to_str().unwrap();
     println!("Creating snapshot at: {}", snapshot_path);
 
-    let stream = SnapshotOutputStream::new(snapshot_path).expect("Failed to create snapshot stream.");
+    let mut stream = SnapshotOutputStream::new(snapshot_path).expect("Failed to create snapshot stream.");
 
     stream.write_entity(EntityId::new(1), &create_player_creator_entity());
 }

@@ -34,45 +34,11 @@ use crate::player_connection::*;
 use std::thread;
 use std::time::Duration;
 
-mod connection_handler;
+pub mod connection_handler;
 #[rustfmt::skip]
-mod generated;
-mod opt;
-mod player_connection;
+pub mod generated;
+pub mod opt;
+pub mod player_connection;
 
-fn main() {
-    let opt = Opt::from_args();
-    let connection = match get_connection(opt) {
-        Ok(c) => c,
-        Err(e) => panic!("{}", e),
-    };
-
-    println!("Connected as: {}", connection.get_worker_id());
-
-    let mut world = World::new();
-
-    world.add_resource(connection);
-
-    let mut dispatcher = DispatcherBuilder::new()
-        .with(SpatialReaderSystem, "reader", &[])
-        .with_barrier()
-        .with(
-            ClientBootstrap {
-                has_requested_player: false,
-            },
-            "",
-            &[],
-        )
-        .with(PlayerCreatorSys, "", &[])
-        .with_barrier()
-        .with(SpatialWriterSystem, "writer", &[])
-        .build();
-
-    dispatcher.setup(&mut world.res);
-
-    loop {
-        dispatcher.dispatch(&world.res);
-
-        thread::sleep(Duration::from_millis(1000))
-    }
-}
+pub use self::connection_handler::*;
+pub use self::opt::*;
