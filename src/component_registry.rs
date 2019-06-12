@@ -176,7 +176,7 @@ impl<T: 'static + SpatialComponent + Sync + Send + Clone + Debug> ComponentDispa
         entity: SpatialEntity,
         command_response: CommandResponseOp,
     ) {
-        CommandSender::<T>::fetch(res).got_command_response(res, command_response);
+        CommandSenderImpl::<T>::got_command_response(res, command_response);
     }
 
     fn replicate(&self, res: &Resources, connection: &mut WorkerConnection) {

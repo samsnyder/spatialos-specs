@@ -112,9 +112,13 @@ impl<T: 'static + SpatialComponent> CommandSenderImpl<T> {
 			}
 		})));
 	}
+	
+	pub(crate) fn got_command_response(res: &Resources, response_op: CommandResponseOp) {
+		let callback = {
+			CommandSender::<T>::fetch(res).callbacks.remove(&response_op.request_id)
+		};
 
-	pub(crate) fn got_command_response(&mut self, res: &Resources, response_op: CommandResponseOp) {
-		match self.callbacks.remove(&response_op.request_id) {
+		match callback {
 			Some(callback) => callback(res, response_op),
 			None => println!("Unknown request ID: {:?}", response_op.request_id)
 		}

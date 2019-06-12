@@ -1,4 +1,5 @@
 use crate::component_registry::*;
+use crate::system_commands::*;
 use crate::storage::*;
 use crate::entities::*;
 use crate::*;
@@ -23,6 +24,7 @@ impl SpatialReader {
     }
 
     pub fn setup(res: &mut Resources) {
+        SystemCommandSender::setup(res);
         SpatialEntitiesWrite::setup(res);
     }
 
@@ -109,6 +111,9 @@ impl SpatialReader {
                             interface.on_command_response(res, entity, command_response);
                         }
                     }
+                }
+                WorkerOp::CreateEntityResponse(create_entity_response) => {
+                    SystemCommandSenderImpl::got_create_entity_response(res, create_entity_response);
                 }
                 _ => {}
             }

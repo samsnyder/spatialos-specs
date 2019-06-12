@@ -27,7 +27,7 @@ type IntermediateCallback<O> = Box<FnOnce(&Resources, O) + Send + Sync>;
 
 pub struct SystemCommandSenderImpl {
 	create_entity_callbacks: HashMap<RequestId<CreateEntityRequest>, IntermediateCallback<CreateEntityResponseOp>>,
-	buffered_create_entity_requests: Vec<(WorkerEntity, IntermediateCallback<CreateEntityResponseOp>)>
+	buffered_create_entity_requests: Vec<(NoAccessContainer<WorkerEntity>, IntermediateCallback<CreateEntityResponseOp>)>
 }
 
 // TODO expose parameters like timeout
@@ -40,13 +40,17 @@ impl SystemCommandSenderImpl {
 	where 
 		F: 'static + FnOnce(&Resources, Result<EntityId, StatusCode<EntityId>>) + Send + Sync
 	{
-		self.buffered_create_entity_requests.push((entity, Box::new(|res, response_op| {
+		self.buffered_create_entity_requests.push((NoAccessContainer::new(entity), Box::new(|res, response_op| {
 			callback(res, SystemCommandSenderImpl::status_code_to_result(response_op.status_code));
 		})));
 	}
 
-	pub(crate) fn got_create_entity_response(&mut self, res: &Resources, response_op: CreateEntityResponseOp) {
-		match self.create_entity_callbacks.remove(&response_op.request_id) {
+	pub(crate) fn got_create_entity_response(res: &Resources, response_op: CreateEntityResponseOp) {
+		let callback = {
+			SystemCommandSender::fetch(res).create_entity_callbacks.remove(&response_op.request_id)
+		};
+
+		match callback {
 			Some(callback) => callback(res, response_op),
 			None => println!("Unknown request ID: {:?}", response_op.request_id)
 		}
@@ -54,7 +58,7 @@ impl SystemCommandSenderImpl {
 
 	pub(crate) fn flush_requests(&mut self, connection: &mut WorkerConnection) {
 		for (entity, callback) in self.buffered_create_entity_requests.drain(..) {
-			let request_id = connection.send_create_entity_request(entity, None, Default::default());
+			let request_id = connection.send_create_entity_request(entity.get_data(), None, Default::default());
 			self.create_entity_callbacks.insert(request_id, callback);
 		}
 	}
@@ -79,3 +83,25 @@ impl Default for SystemCommandSenderImpl {
 		}
 	}
 }
+
+
+
+struct NoAccessContainer<T> {
+    data: T
+}
+
+impl<T> NoAccessContainer<T> {
+    fn new(data: T) -> NoAccessContainer<T> {
+        NoAccessContainer {
+            data
+        }
+    }
+
+    fn get_data(self) -> T {
+        self.data
+    }
+}
+
+// This is safe as the data inside cannot be accessed.
+unsafe impl<T> Send for NoAccessContainer<T> {}
+unsafe impl<T> Sync for NoAccessContainer<T> {}

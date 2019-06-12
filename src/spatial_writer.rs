@@ -1,4 +1,5 @@
 use crate::component_registry::*;
+use crate::system_commands::*;
 use crate::storage::*;
 use crate::*;
 use spatialos_sdk::worker::component::Component as SpatialComponent;
@@ -26,6 +27,8 @@ impl SpatialWriter {
         for interface in res.fetch::<ComponentRegistry>().interfaces_iter() {
             interface.replicate(&res, &mut connection);
         }
+
+        SystemCommandSender::fetch(res).flush_requests(&mut connection);
     }
 }
 
