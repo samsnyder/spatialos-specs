@@ -7,7 +7,7 @@
   "loadBalancing": {
     "layerConfigurations": [
       {
-        "layer": "rusty",
+        "layer": "managed",
         "rectangle_grid": {
           "cols": 1,
           "rows": 1

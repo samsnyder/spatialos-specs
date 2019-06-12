@@ -30,10 +30,10 @@ impl<'a> System<'a> for ClientBootstrap {
         CommandSender<'a, PlayerCreator>,
     );
 
-    fn run(&mut self, (_, entities, mut player_command_sender): Self::SystemData) {
+    fn run(&mut self, (creator, entities, mut player_command_sender): Self::SystemData) {
         if (!self.has_requested_player) {
-            match entities.join().next() {
-                Some(player_creator_entity) => {
+            match (&creator, &entities).join().next() {
+                Some((_, player_creator_entity)) => {
                     self.has_requested_player = true;
 
                     player_command_sender.send_command(
@@ -48,38 +48,7 @@ impl<'a> System<'a> for ClientBootstrap {
                 }
                 None => {}
             }
-
-            // player_command_sender.send_command()
         }
-
-        // for (entity, pos) in (&entities, &mut pos).join() {
-        //     println!("write: {:?}", pos.coords);
-        //     pos.coords.x = rng.gen();
-
-        //     let this_entity = *entity;
-
-        //     example_command_sender.send_command(
-        //         this_entity.entity_id(),
-        //         ExampleCommandRequest::TestCommand(CommandData { value: rng.gen() }),
-        //         move |res, response| {
-
-        //             let mut storage = SpatialWriteStorage::<Position>::fetch(res);
-        //             storage.get_mut(this_entity).unwrap().coords.x = 5.0;
-
-        //             match response {
-        //                 Ok(response) => println!("response {:?}", response),
-        //                 Err(err) => println!("error {:?}", err)
-        //             };
-
-        //             let player_entity = create_player_entity(true);
-
-        //             SystemCommandSender::fetch(res).create_entity(player_entity, |res, entity_id| {
-        //                 println!("created entity! {:?}", entity_id);
-        //                 let sender = SystemCommandSender::fetch(res);
-        //             });
-        //         }
-        //     );
-        // }
     }
 }
 

@@ -23,6 +23,7 @@ use std::time::Duration;
 use rand::Rng;
 
 use example::generated::game::*;
+use example::generated::improbable::*;
 
 fn main() {
     let opt = Opt::from_args();
@@ -37,13 +38,14 @@ fn main() {
 
     let mut stream = SnapshotOutputStream::new(snapshot_path).expect("Failed to create snapshot stream.");
 
-    stream.write_entity(EntityId::new(1), &create_player_creator_entity());
+    println!("{:?}", stream.write_entity(EntityId::new(1), &create_player_creator_entity()));
 }
 
 fn create_player_creator_entity() -> WorkerEntity {
     let mut builder = EntityBuilder::new(0.0, 0.0, 0.0, "managed");
 
     builder.add_component(PlayerCreator{}, "managed");
+    builder.add_component(Persistence{}, "managed");
     builder.set_metadata("PlayerCreator", "managed");
     builder.set_entity_acl_write_access("managed");
 
