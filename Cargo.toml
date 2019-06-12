@@ -5,6 +5,6 @@ authors = ["sam <samsnyder96@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-spatialos-sdk = { path = "../spatialos-sdk-rs/spatialos-sdk" }
+spatialos-sdk = { path = "./spatialos-sdk-rs/spatialos-sdk" }
 specs = "0.14.3"
 hibitset = { version = "0.5.3", default-features = false }

@@ -37,11 +37,11 @@ impl SpatialEntity {
         }
     }
 
-    pub(crate) fn entity_id(self) -> EntityId {
+    pub fn entity_id(self) -> EntityId {
         self.id
     }
 
-    pub(crate) fn specs_entity(self) -> Entity {
+    pub fn specs_entity(self) -> Entity {
         self.specs_entity
     }
 }
@@ -88,8 +88,8 @@ impl<'a> SpatialEntitiesWrite<'a> {
 		self.entity_id_storage.insert(specs_entity, entity);
 	}
 
-	pub(crate) fn remove_entity(&mut self, entity_id: EntityId) {
-
+	pub(crate) fn remove_entity(&mut self, res: &Resources, entity_id: EntityId) {
+        
 	}
 
 	pub(crate) fn get_entity(&self, entity_id: EntityId) -> Option<SpatialEntity> {

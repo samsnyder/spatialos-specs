@@ -89,12 +89,12 @@ type CommandIntermediateCallback = Box<FnOnce(&Resources, CommandResponseOp) + S
 
 pub struct CommandSenderImpl<T: SpatialComponent> {
 	callbacks: HashMap<RequestId<OutgoingCommandRequest>, CommandIntermediateCallback>,
-	buffered_requests: Vec<(SpatialEntity, T::CommandRequest, CommandIntermediateCallback)>
+	buffered_requests: Vec<(EntityId, T::CommandRequest, CommandIntermediateCallback)>
 }
 
 impl<T: 'static + SpatialComponent> CommandSenderImpl<T> {
 	pub fn send_command<F>(&mut self, 
-			entity_id: SpatialEntity,
+			entity_id: EntityId,
 			request: T::CommandRequest,
 			callback: F) 
 	where 
@@ -112,7 +112,7 @@ impl<T: 'static + SpatialComponent> CommandSenderImpl<T> {
 			}
 		})));
 	}
-	
+
 	pub(crate) fn got_command_response(res: &Resources, response_op: CommandResponseOp) {
 		let callback = {
 			CommandSender::<T>::fetch(res).callbacks.remove(&response_op.request_id)
@@ -125,9 +125,9 @@ impl<T: 'static + SpatialComponent> CommandSenderImpl<T> {
 	}
 
 	pub(crate) fn flush_requests(&mut self, connection: &mut WorkerConnection) {
-		for (entity, request, callback) in self.buffered_requests.drain(..) {
+		for (entity_id, request, callback) in self.buffered_requests.drain(..) {
 			// TODO: Default command params like timeout
-			let request_id = connection.send_command_request::<T>(entity.entity_id(), request, None, Default::default());
+			let request_id = connection.send_command_request::<T>(entity_id, request, None, Default::default());
 			self.callbacks.insert(request_id, callback);
 		}
 	}

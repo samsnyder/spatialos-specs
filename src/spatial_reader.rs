@@ -29,8 +29,10 @@ impl SpatialReader {
     }
 
     pub fn process(&mut self, res: &Resources) {
-        let mut connection = res.fetch_mut::<WorkerConnection>();
-        let ops = connection.get_op_list(0);
+        let ops = {
+            let mut connection = res.fetch_mut::<WorkerConnection>();
+            connection.get_op_list(0)
+        };
 
         for op in &ops {
             match op {
@@ -38,7 +40,7 @@ impl SpatialReader {
                     SpatialEntitiesWrite::fetch(res).got_new_entity(res, add_entity_op.entity_id);
                 }
                 WorkerOp::RemoveEntity(remove_entity_op) => {
-                    SpatialEntitiesWrite::fetch(res).remove_entity(remove_entity_op.entity_id);
+                    SpatialEntitiesWrite::fetch(res).remove_entity(res, remove_entity_op.entity_id);
                 }
                 WorkerOp::AddComponent(add_component) => {
                     match res
