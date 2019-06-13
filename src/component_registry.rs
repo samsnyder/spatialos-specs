@@ -1,19 +1,21 @@
 use crate::commands::{
-    CommandRequests, CommandRequestsExt, CommandResponder, CommandSender, CommandSenderImpl,
+    CommandRequests, CommandRequestsComp, CommandRequestsExt, CommandSender, CommandSenderRes,
 };
 use crate::entities::SpatialEntity;
 use crate::storage::{AuthorityBitSet, SpatialStorage, SpatialWriteStorage};
-use crate::SynchronisedComponent;
-use spatialos_sdk::worker::component::Component as SpatialComponent;
+use crate::SpatialComponent;
+use spatialos_sdk::worker::component::Component as WorkerComponent;
 use spatialos_sdk::worker::component::ComponentId;
 use spatialos_sdk::worker::connection::WorkerConnection;
 use spatialos_sdk::worker::op::{
     AddComponentOp, AuthorityChangeOp, CommandRequestOp, CommandResponseOp, ComponentUpdateOp,
 };
 use specs::prelude::{Join, ReadStorage, Resources, Storage, SystemData, Write, WriteStorage};
+use specs::shred::{Resource, ResourceId};
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::marker::PhantomData;
+use std::ops::{Deref, DerefMut};
 
 pub(crate) struct ComponentRegistry {
     interfaces: HashMap<ComponentId, Box<ComponentDispatcherInterface + Send + Sync>>,
@@ -22,19 +24,18 @@ pub(crate) struct ComponentRegistry {
 impl Default for ComponentRegistry {
     fn default() -> Self {
         ComponentRegistry {
-            interfaces: HashMap::new()
+            interfaces: HashMap::new(),
         }
     }
 }
 
 impl ComponentRegistry {
-
-    pub(crate) fn register_component<T: 'static + SpatialComponent>(res: &mut Resources) {
+    pub(crate) fn register_component<T: 'static + WorkerComponent>(res: &mut Resources) {
         // Create component data storage.
-        WriteStorage::<SynchronisedComponent<T>>::setup(res);
+        WriteStorage::<SpatialComponent<T>>::setup(res);
 
         // Create command sender resource.
-        Write::<CommandSenderImpl<T>>::setup(res);
+        Write::<CommandSenderRes<T>>::setup(res);
 
         // Create command receiver storage.
         CommandRequests::<T>::setup(res);
@@ -46,7 +47,7 @@ impl ComponentRegistry {
         res.insert(AuthorityBitSet::<T>::new());
     }
 
-    fn register_component_on_self<T: 'static + SpatialComponent>(&mut self) {
+    fn register_component_on_self<T: 'static + WorkerComponent>(&mut self) {
         let interface = ComponentDispatcher::<T> {
             _phantom: PhantomData,
         };
@@ -67,7 +68,7 @@ impl ComponentRegistry {
     }
 }
 
-struct ComponentDispatcher<T: 'static + SpatialComponent + Sync + Send + Clone + Debug> {
+struct ComponentDispatcher<T: 'static + WorkerComponent + Sync + Send + Clone + Debug> {
     _phantom: PhantomData<T>,
 }
 
@@ -101,7 +102,7 @@ pub(crate) trait ComponentDispatcherInterface {
     fn replicate(&self, res: &Resources, connection: &mut WorkerConnection);
 }
 
-impl<T: 'static + SpatialComponent + Sync + Send + Clone + Debug> ComponentDispatcherInterface
+impl<T: 'static + WorkerComponent + Sync + Send + Clone + Debug> ComponentDispatcherInterface
     for ComponentDispatcher<T>
 {
     fn add_component<'b>(
@@ -113,9 +114,7 @@ impl<T: 'static + SpatialComponent + Sync + Send + Clone + Debug> ComponentDispa
         let mut storage: SpatialWriteStorage<T> = SpatialStorage::fetch(res);
         let data = add_component.get::<T>().unwrap().clone();
 
-        storage
-            .insert(entity, SynchronisedComponent::new(data))
-            .unwrap();
+        storage.insert(entity, SpatialComponent::new(data)).unwrap();
     }
 
     fn remove_component<'b>(&self, res: &Resources, entity: SpatialEntity) {
@@ -167,7 +166,7 @@ impl<T: 'static + SpatialComponent + Sync + Send + Clone + Debug> ComponentDispa
                 );
             }
             None => {
-                let mut requests: CommandResponder<T> = Default::default();
+                let mut requests: CommandRequestsComp<T> = Default::default();
                 requests.on_request(
                     command_request.request_id,
                     request,
@@ -182,7 +181,7 @@ impl<T: 'static + SpatialComponent + Sync + Send + Clone + Debug> ComponentDispa
     }
 
     fn on_command_response<'b>(&self, res: &Resources, command_response: CommandResponseOp) {
-        CommandSenderImpl::<T>::got_command_response(res, command_response);
+        CommandSenderRes::<T>::got_command_response(res, command_response);
     }
 
     fn replicate(&self, res: &Resources, connection: &mut WorkerConnection) {
@@ -202,5 +201,56 @@ impl<T: 'static + SpatialComponent + Sync + Send + Clone + Debug> ComponentDispa
         }
 
         responses.clear_empty_request_objects(res);
+    }
+}
+
+pub struct WriteAndRegisterComponent<'a, T: 'a + Resource, C: WorkerComponent> {
+    resource: Write<'a, T>,
+    phantom: PhantomData<C>,
+}
+
+impl<'a, T, C: WorkerComponent> Deref for WriteAndRegisterComponent<'a, T, C>
+where
+    T: Resource,
+{
+    type Target = T;
+
+    fn deref(&self) -> &T {
+        self.resource.deref()
+    }
+}
+
+impl<'a, T, C: WorkerComponent> DerefMut for WriteAndRegisterComponent<'a, T, C>
+where
+    T: Resource,
+{
+    fn deref_mut(&mut self) -> &mut T {
+        self.resource.deref_mut()
+    }
+}
+
+impl<'a, T, C: WorkerComponent> SystemData<'a> for WriteAndRegisterComponent<'a, T, C>
+where
+    C: 'static + WorkerComponent,
+    T: Resource + Default,
+{
+    fn setup(res: &mut Resources) {
+        ComponentRegistry::register_component::<C>(res);
+        Write::<T>::setup(res);
+    }
+
+    fn fetch(res: &'a Resources) -> Self {
+        WriteAndRegisterComponent {
+            resource: Write::fetch(res),
+            phantom: PhantomData,
+        }
+    }
+
+    fn reads() -> Vec<ResourceId> {
+        Write::<T>::reads()
+    }
+
+    fn writes() -> Vec<ResourceId> {
+        Write::<T>::writes()
     }
 }

@@ -7,6 +7,7 @@ use specs::shred::{Fetch, FetchMut, ResourceId};
 use specs::storage::MaskedStorage;
 use specs::world::Index;
 use std::collections::HashMap;
+use std::ops::{Deref, DerefMut};
 
 // This must stay immutable
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -52,48 +53,50 @@ pub struct SpatialEntitiesRes {
     entities: HashMap<EntityId, SpatialEntity>,
 }
 
-pub struct SpatialEntitiesSystemData<F, T> {
-    spatial_entities_res: F,
-    entity_id_storage: T,
-}
-
-impl<'a> SpatialEntities<'a> {
-    pub(crate) fn get_entity(&self, entity_id: EntityId) -> Option<SpatialEntity> {
-        match self.spatial_entities_res.entities.get(&entity_id) {
-            Some(entity) => Some(entity.clone()),
-            None => None,
-        }
-    }
-}
-
-impl<'a> SpatialEntitiesWrite<'a> {
+impl SpatialEntitiesRes {
     pub(crate) fn got_new_entity(&mut self, res: &Resources, entity_id: EntityId) {
         let specs_entity = Entities::fetch(res).create();
         let entity = SpatialEntity::new(entity_id, specs_entity);
 
-        self.spatial_entities_res.entities.insert(entity_id, entity);
-        self.entity_id_storage
+        self.entities.insert(entity_id, entity);
+        WriteStorage::<SpatialEntity>::fetch(res)
             .insert(specs_entity, entity)
             .expect("Error inserting new SpatialEntity object.");
     }
 
     pub(crate) fn remove_entity(&mut self, res: &Resources, entity_id: EntityId) {
-        let entity = self
-            .spatial_entities_res
-            .entities
-            .remove(&entity_id)
-            .unwrap();
-        self.entity_id_storage.remove(entity.specs_entity());
+        let entity = self.entities.remove(&entity_id).unwrap();
+        WriteStorage::<SpatialEntity>::fetch(res).remove(entity.specs_entity());
         Entities::fetch(res)
             .delete(entity.specs_entity())
             .expect("Error deleting specs entity.");
     }
 
     pub fn get_entity(&self, entity_id: EntityId) -> Option<SpatialEntity> {
-        match self.spatial_entities_res.entities.get(&entity_id) {
+        match self.entities.get(&entity_id) {
             Some(entity) => Some(entity.clone()),
             None => None,
         }
+    }
+}
+
+#[doc(hidden)]
+pub struct SpatialEntitiesSystemData<F, T> {
+    spatial_entities_res: F,
+    entity_id_storage: T,
+}
+
+impl<F, T> Deref for SpatialEntitiesSystemData<F, T> {
+    type Target = F;
+
+    fn deref(&self) -> &Self::Target {
+        &self.spatial_entities_res
+    }
+}
+
+impl<F, T> DerefMut for SpatialEntitiesSystemData<F, T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.spatial_entities_res
     }
 }
 

@@ -1,23 +1,22 @@
 use crate::component_registry::ComponentRegistry;
 use crate::entities::{SpatialEntities, SpatialEntitiesWrite};
-use crate::system_commands::{SystemCommandSender, SystemCommandSenderImpl};
+use crate::system_commands::{SystemCommandSender, SystemCommandSenderRes};
 use spatialos_sdk::worker::connection::{Connection, WorkerConnection};
 use spatialos_sdk::worker::op::WorkerOp;
 use specs::prelude::{Resources, System, SystemData};
 use specs::shred::ResourceId;
 use specs::world::EntitiesRes;
 
+#[doc(hidden)]
 pub struct ResourcesSystemData<'a> {
-    pub(crate) res: &'a Resources
+    pub(crate) res: &'a Resources,
 }
 
 impl<'a> SystemData<'a> for ResourcesSystemData<'a> {
     fn setup(_: &mut Resources) {}
 
     fn fetch(res: &'a Resources) -> Self {
-        ResourcesSystemData {
-            res
-        }
+        ResourcesSystemData { res }
     }
 
     fn reads() -> Vec<ResourceId> {
@@ -142,25 +141,19 @@ impl<'a> System<'a> for SpatialReaderSystem {
                     }
                 }
                 WorkerOp::ReserveEntityIdsResponse(reserve_entity_ids_response) => {
-                    SystemCommandSenderImpl::got_reserve_entity_ids_response(
+                    SystemCommandSenderRes::got_reserve_entity_ids_response(
                         res,
                         reserve_entity_ids_response,
                     );
                 }
                 WorkerOp::CreateEntityResponse(create_entity_response) => {
-                    SystemCommandSenderImpl::got_create_entity_response(
-                        res,
-                        create_entity_response,
-                    );
+                    SystemCommandSenderRes::got_create_entity_response(res, create_entity_response);
                 }
                 WorkerOp::DeleteEntityResponse(delete_entity_response) => {
-                    SystemCommandSenderImpl::got_delete_entity_response(
-                        res,
-                        delete_entity_response,
-                    );
+                    SystemCommandSenderRes::got_delete_entity_response(res, delete_entity_response);
                 }
                 WorkerOp::EntityQueryResponse(entity_query_response) => {
-                    SystemCommandSenderImpl::got_entity_query_response(res, entity_query_response);
+                    SystemCommandSenderRes::got_entity_query_response(res, entity_query_response);
                 }
                 _ => {}
             }

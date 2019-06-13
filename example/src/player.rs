@@ -1,23 +1,7 @@
-use specs::prelude::*;
-
-use spatialos_sdk::worker::connection::WorkerConnection;
-use spatialos_sdk::worker::entity::Entity as WorkerEntity;
-use spatialos_sdk::worker::entity_builder::EntityBuilder;
-use spatialos_specs::spatial_reader::*;
-use spatialos_specs::spatial_writer::*;
-use spatialos_specs::storage::*;
-
 use crate::generated::game::*;
 use crate::generated::improbable::*;
-use spatialos_specs::commands::*;
-use spatialos_specs::entities::*;
-use spatialos_specs::system_commands::*;
 use spatialos_specs::*;
-
-use std::thread;
-use std::time::Duration;
-
-use rand::Rng;
+use specs::prelude::*;
 
 pub struct MovePlayerSys;
 

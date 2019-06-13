@@ -12,11 +12,11 @@ use spatialos_sdk::worker::{EntityId, RequestId};
 use specs::prelude::{Resources, SystemData, Write};
 use std::collections::HashMap;
 
-pub type SystemCommandSender<'a> = Write<'a, SystemCommandSenderImpl>;
+pub type SystemCommandSender<'a> = Write<'a, SystemCommandSenderRes>;
 
 type IntermediateCallback<O> = Box<FnOnce(&Resources, O) + Send + Sync>;
 
-pub struct SystemCommandSenderImpl {
+pub struct SystemCommandSenderRes {
     reserve_entity_ids_callbacks: HashMap<
         RequestId<ReserveEntityIdsRequest>,
         IntermediateCallback<ReserveEntityIdsResponseOp>,
@@ -42,7 +42,7 @@ pub struct SystemCommandSenderImpl {
 }
 
 // TODO expose parameters like timeout
-impl SystemCommandSenderImpl {
+impl SystemCommandSenderRes {
     pub fn reserve_entity_ids<F>(&mut self, number: u32, callback: F)
     where
         F: 'static
@@ -55,7 +55,7 @@ impl SystemCommandSenderImpl {
             Box::new(|res, response_op| {
                 callback(
                     res,
-                    SystemCommandSenderImpl::status_code_to_result(response_op.status_code),
+                    SystemCommandSenderRes::status_code_to_result(response_op.status_code),
                 );
             }),
         ));
@@ -75,7 +75,7 @@ impl SystemCommandSenderImpl {
             Box::new(|res, response_op| {
                 callback(
                     res,
-                    SystemCommandSenderImpl::status_code_to_result(response_op.status_code),
+                    SystemCommandSenderRes::status_code_to_result(response_op.status_code),
                 );
             }),
         ));
@@ -90,7 +90,7 @@ impl SystemCommandSenderImpl {
             Box::new(|res, response_op| {
                 callback(
                     res,
-                    SystemCommandSenderImpl::status_code_to_result(response_op.status_code),
+                    SystemCommandSenderRes::status_code_to_result(response_op.status_code),
                 );
             }),
         ));
@@ -108,7 +108,7 @@ impl SystemCommandSenderImpl {
             Box::new(|res, response_op| {
                 callback(
                     res,
-                    SystemCommandSenderImpl::status_code_to_result(response_op.status_code),
+                    SystemCommandSenderRes::status_code_to_result(response_op.status_code),
                 );
             }),
         ));
@@ -209,9 +209,9 @@ impl SystemCommandSenderImpl {
     }
 }
 
-impl Default for SystemCommandSenderImpl {
+impl Default for SystemCommandSenderRes {
     fn default() -> Self {
-        SystemCommandSenderImpl {
+        SystemCommandSenderRes {
             reserve_entity_ids_callbacks: HashMap::new(),
             buffered_reserve_entity_ids_requests: Vec::new(),
 

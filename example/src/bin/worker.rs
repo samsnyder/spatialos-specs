@@ -1,39 +1,14 @@
 extern crate structopt;
 
-use example::generated::{game, improbable};
-use example::{connection_handler::*, opt::*};
-use rand::Rng;
-use spatialos_sdk::worker::{
-    commands::{EntityQueryRequest, ReserveEntityIdsRequest},
-    component::{Component, ComponentData, UpdateParameters},
-    connection::{Connection, WorkerConnection},
-    entity_builder::EntityBuilder,
-    metrics::{HistogramMetric, Metrics},
-    op::{StatusCode, WorkerOp},
-    query::{EntityQuery, QueryConstraint, ResultType},
-    {EntityId, InterestOverride, LogLevel},
-};
-use specs::prelude::*;
-use std::{collections::HashMap, f64};
-use structopt::StructOpt;
-
-use spatialos_sdk::worker::entity::Entity as WorkerEntity;
-use spatialos_specs::spatial_reader::*;
-use spatialos_specs::spatial_writer::*;
-use spatialos_specs::storage::*;
-
-use example::generated::game::*;
-use example::generated::improbable::*;
-use spatialos_specs::commands::*;
-use spatialos_specs::entities::*;
-use spatialos_specs::system_commands::*;
-use spatialos_specs::*;
-
-use example::get_connection;
 use example::player::*;
 use example::player_connection::*;
+use example::{connection_handler::*, opt::*};
+use spatialos_sdk::worker::connection::Connection;
+use spatialos_specs::*;
+use specs::prelude::*;
 use std::thread;
 use std::time::Duration;
+use structopt::StructOpt;
 
 fn main() {
     let opt = Opt::from_args();

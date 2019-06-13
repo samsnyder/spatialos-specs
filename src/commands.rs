@@ -1,6 +1,6 @@
-use crate::WriteAndRegisterComponent;
+use crate::component_registry::WriteAndRegisterComponent;
 use spatialos_sdk::worker::commands::{IncomingCommandRequest, OutgoingCommandRequest};
-use spatialos_sdk::worker::component::Component as SpatialComponent;
+use spatialos_sdk::worker::component::Component as WorkerComponent;
 use spatialos_sdk::worker::connection::{Connection, WorkerConnection};
 use spatialos_sdk::worker::op::{CommandResponse, CommandResponseOp, StatusCode};
 use spatialos_sdk::worker::{EntityId, RequestId};
@@ -9,9 +9,9 @@ use specs::prelude::{
 };
 use std::collections::HashMap;
 
-pub type CommandRequests<'a, T> = WriteStorage<'a, CommandResponder<T>>;
+pub type CommandRequests<'a, T> = WriteStorage<'a, CommandRequestsComp<T>>;
 
-pub struct CommandResponder<T: SpatialComponent> {
+pub struct CommandRequestsComp<T: WorkerComponent> {
     requests: Vec<(
         RequestId<IncomingCommandRequest>,
         T::CommandRequest,
@@ -21,20 +21,20 @@ pub struct CommandResponder<T: SpatialComponent> {
     responses: Vec<(RequestId<IncomingCommandRequest>, T::CommandResponse)>,
 }
 
-impl<T: SpatialComponent> Default for CommandResponder<T> {
+impl<T: WorkerComponent> Default for CommandRequestsComp<T> {
     fn default() -> Self {
-        CommandResponder {
+        CommandRequestsComp {
             requests: Vec::new(),
             responses: Vec::new(),
         }
     }
 }
 
-impl<T: 'static + SpatialComponent> Component for CommandResponder<T> {
+impl<T: 'static + WorkerComponent> Component for CommandRequestsComp<T> {
     type Storage = HashMapStorage<Self>;
 }
 
-impl<T: SpatialComponent> CommandResponder<T> {
+impl<T: WorkerComponent> CommandRequestsComp<T> {
     pub(crate) fn on_request(
         &mut self,
         request_id: RequestId<IncomingCommandRequest>,
@@ -78,9 +78,9 @@ pub(crate) trait CommandRequestsExt {
     fn clear_empty_request_objects(&mut self, res: &Resources);
 }
 
-impl<'a, T: 'static + SpatialComponent> CommandRequestsExt for CommandRequests<'a, T> {
+impl<'a, T: 'static + WorkerComponent> CommandRequestsExt for CommandRequests<'a, T> {
     fn clear_empty_request_objects(&mut self, res: &Resources) {
-        let non_empty_requests: Vec<(CommandResponder<T>, Entity)> =
+        let non_empty_requests: Vec<(CommandRequestsComp<T>, Entity)> =
             (self.drain(), &Entities::fetch(res))
                 .join()
                 .filter(|r| r.0.requests.len() > 0)
@@ -95,16 +95,16 @@ impl<'a, T: 'static + SpatialComponent> CommandRequestsExt for CommandRequests<'
     }
 }
 
-pub type CommandSender<'a, T> = WriteAndRegisterComponent<'a, CommandSenderImpl<T>, T>;
+pub type CommandSender<'a, T> = WriteAndRegisterComponent<'a, CommandSenderRes<T>, T>;
 
 type CommandIntermediateCallback = Box<FnOnce(&Resources, CommandResponseOp) + Send + Sync>;
 
-pub struct CommandSenderImpl<T: SpatialComponent> {
+pub struct CommandSenderRes<T: WorkerComponent> {
     callbacks: HashMap<RequestId<OutgoingCommandRequest>, CommandIntermediateCallback>,
     buffered_requests: Vec<(EntityId, T::CommandRequest, CommandIntermediateCallback)>,
 }
 
-impl<T: 'static + SpatialComponent> CommandSenderImpl<T> {
+impl<T: 'static + WorkerComponent> CommandSenderRes<T> {
     pub fn send_command<F>(&mut self, entity_id: EntityId, request: T::CommandRequest, callback: F)
     where
         F: 'static
@@ -150,9 +150,9 @@ impl<T: 'static + SpatialComponent> CommandSenderImpl<T> {
     }
 }
 
-impl<T: SpatialComponent> Default for CommandSenderImpl<T> {
+impl<T: WorkerComponent> Default for CommandSenderRes<T> {
     fn default() -> Self {
-        CommandSenderImpl {
+        CommandSenderRes {
             callbacks: HashMap::new(),
             buffered_requests: Vec::new(),
         }
