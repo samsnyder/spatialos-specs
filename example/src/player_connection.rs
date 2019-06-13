@@ -61,14 +61,21 @@ impl<'a> System<'a> for PlayerCreatorSys {
         for request in (&mut requests).join() {
             request.respond(|request, caller_worker_id, _| match request {
                 PlayerCreatorCommandRequest::CreatePlayer(request) => {
-                    let entity = Self::create_player_entity(request.name.clone());
-
+                    let player_name = request.name.clone();
                     let caller_worker_id = caller_worker_id.clone();
-                    sys_command_sender.create_entity(entity, move |_res, result| {
-                        println!(
-                            "Created player entity for {}: {:?}",
-                            caller_worker_id, result
-                        );
+
+                    sys_command_sender.reserve_entity_ids(1, move |res, result| {
+                        let entity = Self::create_player_entity(player_name);
+
+                        let reserved_id = result.unwrap().next().unwrap();
+                        let mut sys_command_sender = SystemCommandSender::fetch(res);
+
+                        sys_command_sender.create_entity(entity, Some(reserved_id), move |_res, result| {
+                            println!(
+                                "Created player entity for {}: {:?}",
+                                caller_worker_id, result
+                            );
+                        });
                     });
 
                     Some(PlayerCreatorCommandResponse::CreatePlayer(

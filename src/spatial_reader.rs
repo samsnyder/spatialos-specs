@@ -114,10 +114,28 @@ impl SpatialReader {
                         }
                     }
                 }
+                WorkerOp::ReserveEntityIdsResponse(reserve_entity_ids_response) => {
+                    SystemCommandSenderImpl::got_reserve_entity_ids_response(
+                        res,
+                        reserve_entity_ids_response,
+                    );
+                }
                 WorkerOp::CreateEntityResponse(create_entity_response) => {
                     SystemCommandSenderImpl::got_create_entity_response(
                         res,
                         create_entity_response,
+                    );
+                }
+                WorkerOp::DeleteEntityResponse(delete_entity_response) => {
+                    SystemCommandSenderImpl::got_delete_entity_response(
+                        res,
+                        delete_entity_response,
+                    );
+                }
+                WorkerOp::EntityQueryResponse(entity_query_response) => {
+                    SystemCommandSenderImpl::got_entity_query_response(
+                        res,
+                        entity_query_response,
                     );
                 }
                 _ => {}

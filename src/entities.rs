@@ -84,7 +84,9 @@ impl<'a> SpatialEntitiesWrite<'a> {
             .remove(&entity_id)
             .unwrap();
         self.entity_id_storage.remove(entity.specs_entity());
-        Entities::fetch(res).delete(entity.specs_entity()).expect("Error deleting specs entity.");
+        Entities::fetch(res)
+            .delete(entity.specs_entity())
+            .expect("Error deleting specs entity.");
     }
 
     pub fn get_entity(&self, entity_id: EntityId) -> Option<SpatialEntity> {
