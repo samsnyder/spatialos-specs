@@ -1,19 +1,9 @@
 use std::path::PathBuf;
 use structopt::StructOpt;
-
 use spatialos_sdk::worker::snapshot::*;
-use specs::prelude::*;
-
-use spatialos_sdk::worker::connection::WorkerConnection;
 use spatialos_sdk::worker::entity::Entity as WorkerEntity;
 use spatialos_sdk::worker::entity_builder::EntityBuilder;
 use spatialos_sdk::worker::*;
-
-use std::thread;
-use std::time::Duration;
-
-use rand::Rng;
-
 use example::generated::game::*;
 use example::generated::improbable::*;
 

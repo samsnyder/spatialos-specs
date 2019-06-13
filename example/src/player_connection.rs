@@ -16,7 +16,7 @@ impl<'a> System<'a> for ClientBootstrap {
     );
 
     fn run(&mut self, (creator, entities, mut player_command_sender): Self::SystemData) {
-        if (!self.has_requested_player) {
+        if !self.has_requested_player {
             match (&creator, &entities).join().next() {
                 Some((_, player_creator_entity)) => {
                     self.has_requested_player = true;
@@ -26,7 +26,7 @@ impl<'a> System<'a> for ClientBootstrap {
                         PlayerCreatorCommandRequest::CreatePlayer(CreatePlayerRequest {
                             name: "MyName".to_string(),
                         }),
-                        |res, result| {
+                        |_res, result| {
                             println!("Created player! {:?}", result);
                         },
                     )
