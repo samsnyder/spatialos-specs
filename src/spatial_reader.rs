@@ -133,10 +133,7 @@ impl SpatialReader {
                     );
                 }
                 WorkerOp::EntityQueryResponse(entity_query_response) => {
-                    SystemCommandSenderImpl::got_entity_query_response(
-                        res,
-                        entity_query_response,
-                    );
+                    SystemCommandSenderImpl::got_entity_query_response(res, entity_query_response);
                 }
                 _ => {}
             }

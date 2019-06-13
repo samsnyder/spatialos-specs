@@ -1,11 +1,11 @@
 use spatialos_sdk::worker::commands::{
-    CreateEntityRequest, DeleteEntityRequest, EntityQueryRequest, ReserveEntityIdsRequest
+    CreateEntityRequest, DeleteEntityRequest, EntityQueryRequest, ReserveEntityIdsRequest,
 };
 use spatialos_sdk::worker::connection::{Connection, WorkerConnection};
 use spatialos_sdk::worker::entity::Entity as WorkerEntity;
 use spatialos_sdk::worker::op::{
     CreateEntityResponseOp, DeleteEntityResponseOp, EntityQueryResponseOp, QueryResponse,
-    StatusCode, ReserveEntityIdsResponseOp, ReservedEntityIdRange
+    ReserveEntityIdsResponseOp, ReservedEntityIdRange, StatusCode,
 };
 use spatialos_sdk::worker::query::EntityQuery;
 use spatialos_sdk::worker::{EntityId, RequestId};
@@ -17,9 +17,12 @@ pub type SystemCommandSender<'a> = Write<'a, SystemCommandSenderImpl>;
 type IntermediateCallback<O> = Box<FnOnce(&Resources, O) + Send + Sync>;
 
 pub struct SystemCommandSenderImpl {
-    reserve_entity_ids_callbacks:
-        HashMap<RequestId<ReserveEntityIdsRequest>, IntermediateCallback<ReserveEntityIdsResponseOp>>,
-    buffered_reserve_entity_ids_requests: Vec<(u32, IntermediateCallback<ReserveEntityIdsResponseOp>)>,
+    reserve_entity_ids_callbacks: HashMap<
+        RequestId<ReserveEntityIdsRequest>,
+        IntermediateCallback<ReserveEntityIdsResponseOp>,
+    >,
+    buffered_reserve_entity_ids_requests:
+        Vec<(u32, IntermediateCallback<ReserveEntityIdsResponseOp>)>,
 
     create_entity_callbacks:
         HashMap<RequestId<CreateEntityRequest>, IntermediateCallback<CreateEntityResponseOp>>,
@@ -42,7 +45,10 @@ pub struct SystemCommandSenderImpl {
 impl SystemCommandSenderImpl {
     pub fn reserve_entity_ids<F>(&mut self, number: u32, callback: F)
     where
-        F: 'static + FnOnce(&Resources, Result<ReservedEntityIdRange, StatusCode<ReservedEntityIdRange>>) + Send + Sync,
+        F: 'static
+            + FnOnce(&Resources, Result<ReservedEntityIdRange, StatusCode<ReservedEntityIdRange>>)
+            + Send
+            + Sync,
     {
         self.buffered_reserve_entity_ids_requests.push((
             number,
@@ -55,8 +61,12 @@ impl SystemCommandSenderImpl {
         ));
     }
 
-    pub fn create_entity<F>(&mut self, entity: WorkerEntity, reserved_entity_id: Option<EntityId>, callback: F)
-    where
+    pub fn create_entity<F>(
+        &mut self,
+        entity: WorkerEntity,
+        reserved_entity_id: Option<EntityId>,
+        callback: F,
+    ) where
         F: 'static + FnOnce(&Resources, Result<EntityId, StatusCode<EntityId>>) + Send + Sync,
     {
         self.buffered_create_entity_requests.push((
@@ -104,7 +114,10 @@ impl SystemCommandSenderImpl {
         ));
     }
 
-    pub(crate) fn got_reserve_entity_ids_response(res: &Resources, response_op: ReserveEntityIdsResponseOp) {
+    pub(crate) fn got_reserve_entity_ids_response(
+        res: &Resources,
+        response_op: ReserveEntityIdsResponseOp,
+    ) {
         let callback = {
             SystemCommandSender::fetch(res)
                 .reserve_entity_ids_callbacks
@@ -158,14 +171,20 @@ impl SystemCommandSenderImpl {
 
     pub(crate) fn flush_requests(&mut self, connection: &mut WorkerConnection) {
         for (number, callback) in self.buffered_reserve_entity_ids_requests.drain(..) {
-            let request_id =
-                connection.send_reserve_entity_ids_request(ReserveEntityIdsRequest(number), Default::default());
-            self.reserve_entity_ids_callbacks.insert(request_id, callback);
+            let request_id = connection.send_reserve_entity_ids_request(
+                ReserveEntityIdsRequest(number),
+                Default::default(),
+            );
+            self.reserve_entity_ids_callbacks
+                .insert(request_id, callback);
         }
 
         for (entity, entity_id, callback) in self.buffered_create_entity_requests.drain(..) {
-            let request_id =
-                connection.send_create_entity_request(entity.get_data(), entity_id, Default::default());
+            let request_id = connection.send_create_entity_request(
+                entity.get_data(),
+                entity_id,
+                Default::default(),
+            );
             self.create_entity_callbacks.insert(request_id, callback);
         }
 
@@ -176,8 +195,8 @@ impl SystemCommandSenderImpl {
         }
 
         for (query, callback) in self.buffered_entity_query_requests.drain(..) {
-            let request_id = connection
-                .send_entity_query_request(EntityQueryRequest(query), Default::default());
+            let request_id =
+                connection.send_entity_query_request(EntityQueryRequest(query), Default::default());
             self.entity_query_callbacks.insert(request_id, callback);
         }
     }

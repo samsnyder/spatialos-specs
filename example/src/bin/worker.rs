@@ -30,8 +30,8 @@ use spatialos_specs::system_commands::*;
 use spatialos_specs::*;
 
 use example::get_connection;
-use example::player_connection::*;
 use example::player::*;
+use example::player_connection::*;
 use std::thread;
 use std::time::Duration;
 

@@ -70,12 +70,16 @@ impl<'a> System<'a> for PlayerCreatorSys {
                         let reserved_id = result.unwrap().next().unwrap();
                         let mut sys_command_sender = SystemCommandSender::fetch(res);
 
-                        sys_command_sender.create_entity(entity, Some(reserved_id), move |_res, result| {
-                            println!(
-                                "Created player entity for {}: {:?}",
-                                caller_worker_id, result
-                            );
-                        });
+                        sys_command_sender.create_entity(
+                            entity,
+                            Some(reserved_id),
+                            move |_res, result| {
+                                println!(
+                                    "Created player entity for {}: {:?}",
+                                    caller_worker_id, result
+                                );
+                            },
+                        );
                     });
 
                     Some(PlayerCreatorCommandResponse::CreatePlayer(
@@ -91,10 +95,13 @@ impl PlayerCreatorSys {
     fn create_player_entity(name: String) -> WorkerEntity {
         let mut builder = EntityBuilder::new(0.0, 0.0, 0.0, "managed");
 
-        builder.add_component(Player {
-            name,
-            current_direction: 0
-        }, "managed");
+        builder.add_component(
+            Player {
+                name,
+                current_direction: 0,
+            },
+            "managed",
+        );
         builder.set_metadata("Player", "managed");
         builder.set_entity_acl_write_access("managed");
 

@@ -32,32 +32,31 @@ impl<'a> System<'a> for MovePlayerSys {
 
     fn run(&mut self, (mut player, mut position): Self::SystemData) {
         for (player, position) in (&mut player, &mut position).join() {
+            let mut change_direction = false;
 
-        	let mut change_direction = false;
+            match player.current_direction {
+                0 => {
+                    position.coords.x += DISTANCE_PER_FRAME;
+                    change_direction = position.coords.x > DISTANCE;
+                }
+                1 => {
+                    position.coords.z += DISTANCE_PER_FRAME;
+                    change_direction = position.coords.z > DISTANCE;
+                }
+                2 => {
+                    position.coords.x -= DISTANCE_PER_FRAME;
+                    change_direction = position.coords.x < -DISTANCE;
+                }
+                3 => {
+                    position.coords.z -= DISTANCE_PER_FRAME;
+                    change_direction = position.coords.z < -DISTANCE;
+                }
+                _ => {}
+            }
 
-        	match player.current_direction {
-        		0 => {
-        			position.coords.x += DISTANCE_PER_FRAME;
-        			change_direction = position.coords.x > DISTANCE;
-        		}
-        		1 => {
-        			position.coords.z += DISTANCE_PER_FRAME;
-        			change_direction = position.coords.z > DISTANCE;
-        		}
-        		2 => {
-        			position.coords.x -= DISTANCE_PER_FRAME;
-        			change_direction = position.coords.x < -DISTANCE;
-        		}
-        		3 => {
-        			position.coords.z -= DISTANCE_PER_FRAME;
-        			change_direction = position.coords.z < -DISTANCE;
-        		}
-        		_ => {}
-        	}
-
-        	if change_direction {
-        		player.current_direction = (player.current_direction + 1) % 4;
-        	}
+            if change_direction {
+                player.current_direction = (player.current_direction + 1) % 4;
+            }
         }
     }
 }

@@ -129,7 +129,10 @@ impl<T: 'static + SpatialComponent + Sync + Send + Clone + Debug> ComponentDispa
         let mut storage: SpatialWriteStorage<T> = SpatialStorage::fetch(res);
         let update = component_update.get::<T>().unwrap().clone();
 
-        storage.get_mut(entity).unwrap().apply_update_to_value(update);
+        storage
+            .get_mut(entity)
+            .unwrap()
+            .apply_update_to_value(update);
     }
 
     fn apply_authority_change<'b>(

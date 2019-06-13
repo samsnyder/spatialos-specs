@@ -8,9 +8,9 @@ pub mod system_commands;
 
 use crate::component_registry::ComponentRegistry;
 use spatialos_sdk::worker::component::Component as SpatialComponent;
-use spatialos_sdk::worker::component::{TypeConversion, ComponentUpdate, UpdateParameters};
+use spatialos_sdk::worker::component::{ComponentUpdate, TypeConversion, UpdateParameters};
+use spatialos_sdk::worker::connection::{Connection, WorkerConnection};
 use spatialos_sdk::worker::internal::schema::SchemaComponentUpdate;
-use spatialos_sdk::worker::connection::{WorkerConnection, Connection};
 use spatialos_sdk::worker::EntityId;
 use specs::prelude::{Component, Resources, SystemData, VecStorage, Write};
 use specs::shred::{Resource, ResourceId};
@@ -22,7 +22,7 @@ use std::ops::{Deref, DerefMut};
 pub struct SynchronisedComponent<T: SpatialComponent + Debug> {
     value: T,
     value_is_dirty: bool,
-    current_update: Option<T::Update>
+    current_update: Option<T::Update>,
 }
 
 impl<T: SpatialComponent + TypeConversion + Debug> SynchronisedComponent<T> {
@@ -30,7 +30,7 @@ impl<T: SpatialComponent + TypeConversion + Debug> SynchronisedComponent<T> {
         SynchronisedComponent {
             value,
             value_is_dirty: false,
-            current_update: None
+            current_update: None,
         }
     }
 
@@ -45,11 +45,7 @@ impl<T: SpatialComponent + TypeConversion + Debug> SynchronisedComponent<T> {
         };
 
         if let Some(update) = update {
-            connection.send_component_update::<T>(
-                entity_id,
-                update,
-                UpdateParameters::default(),
-            );
+            connection.send_component_update::<T>(entity_id, update, UpdateParameters::default());
         }
     }
 
@@ -75,7 +71,7 @@ impl<T: SpatialComponent + TypeConversion + Debug> SynchronisedComponent<T> {
 
         match &mut self.current_update {
             Some(current_update) => current_update.merge(update),
-            None => self.current_update = Some(update)
+            None => self.current_update = Some(update),
         }
     }
 }
