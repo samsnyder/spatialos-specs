@@ -7,30 +7,31 @@ use specs::prelude::{Resources, System, SystemData};
 use specs::shred::ResourceId;
 use specs::world::EntitiesRes;
 
-#[doc(hidden)]
-pub struct ResourcesSystemData<'a> {
-    pub(crate) res: &'a Resources,
-}
-
-impl<'a> SystemData<'a> for ResourcesSystemData<'a> {
-    fn setup(_: &mut Resources) {}
-
-    fn fetch(res: &'a Resources) -> Self {
-        ResourcesSystemData { res }
-    }
-
-    fn reads() -> Vec<ResourceId> {
-        vec![]
-    }
-
-    fn writes() -> Vec<ResourceId> {
-        vec![
-            ResourceId::new::<EntitiesRes>(),
-            ResourceId::new::<WorkerConnection>(),
-        ]
-    }
-}
-
+/// A system which receives operations from SpatialOS and applies them
+/// to the local world.
+///
+/// This system should run at the beginning of each frame.
+///
+/// This system **must not run in parallel with other systems**, or you may
+/// get a runtime panic. You can ensure this by creating a barrier after the system.
+///
+/// ## Example
+///
+/// ```
+/// let mut world = World::new();
+///
+/// let mut dispatcher = DispatcherBuilder::new()
+///     .with(SpatialReaderSystem, "reader", &[])
+///     .with_barrier()
+///
+///     .with(MovePlayerSys, "", &[])
+///
+///     .with_barrier()
+///     .with(SpatialWriterSystem, "writer", &[])
+///     .build();
+///
+/// dispatcher.setup(&mut world.res);
+/// ```
 pub struct SpatialReaderSystem;
 
 impl<'a> System<'a> for SpatialReaderSystem {
@@ -158,5 +159,33 @@ impl<'a> System<'a> for SpatialReaderSystem {
                 _ => {}
             }
         }
+    }
+}
+
+/// A SystemData which gives a reference to Resources.
+///
+/// This allows arbitrary fetches. This can cause runtime panics if a fetched
+/// resource has been fetched by another system running in parallel.
+#[doc(hidden)]
+pub struct ResourcesSystemData<'a> {
+    pub(crate) res: &'a Resources,
+}
+
+impl<'a> SystemData<'a> for ResourcesSystemData<'a> {
+    fn setup(_: &mut Resources) {}
+
+    fn fetch(res: &'a Resources) -> Self {
+        ResourcesSystemData { res }
+    }
+
+    fn reads() -> Vec<ResourceId> {
+        vec![]
+    }
+
+    fn writes() -> Vec<ResourceId> {
+        vec![
+            ResourceId::new::<EntitiesRes>(),
+            ResourceId::new::<WorkerConnection>(),
+        ]
     }
 }
