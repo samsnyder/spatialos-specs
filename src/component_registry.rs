@@ -19,12 +19,15 @@ pub(crate) struct ComponentRegistry {
     interfaces: HashMap<ComponentId, Box<ComponentDispatcherInterface + Send + Sync>>,
 }
 
-impl ComponentRegistry {
-    fn new() -> ComponentRegistry {
+impl Default for ComponentRegistry {
+    fn default() -> Self {
         ComponentRegistry {
-            interfaces: HashMap::new(),
+            interfaces: HashMap::new()
         }
     }
+}
+
+impl ComponentRegistry {
 
     pub(crate) fn register_component<T: 'static + SpatialComponent>(res: &mut Resources) {
         // Create component data storage.
@@ -37,7 +40,7 @@ impl ComponentRegistry {
         CommandRequests::<T>::setup(res);
 
         res.entry::<ComponentRegistry>()
-            .or_insert_with(|| ComponentRegistry::new())
+            .or_insert_with(|| Default::default())
             .register_component_on_self::<T>();
 
         res.insert(AuthorityBitSet::<T>::new());

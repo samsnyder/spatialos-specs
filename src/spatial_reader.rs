@@ -7,19 +7,46 @@ use specs::prelude::{Resources, System, SystemData};
 use specs::shred::ResourceId;
 use specs::world::EntitiesRes;
 
-pub struct SpatialReader {}
+pub struct ResourcesSystemData<'a> {
+    pub(crate) res: &'a Resources
+}
 
-impl SpatialReader {
-    pub fn new() -> SpatialReader {
-        SpatialReader {}
+impl<'a> SystemData<'a> for ResourcesSystemData<'a> {
+    fn setup(_: &mut Resources) {}
+
+    fn fetch(res: &'a Resources) -> Self {
+        ResourcesSystemData {
+            res
+        }
     }
 
-    pub fn setup(res: &mut Resources) {
+    fn reads() -> Vec<ResourceId> {
+        vec![]
+    }
+
+    fn writes() -> Vec<ResourceId> {
+        vec![
+            ResourceId::new::<EntitiesRes>(),
+            ResourceId::new::<WorkerConnection>(),
+        ]
+    }
+}
+
+pub struct SpatialReaderSystem;
+
+impl<'a> System<'a> for SpatialReaderSystem {
+    type SystemData = ResourcesSystemData<'a>;
+
+    fn setup(&mut self, res: &mut Resources) {
+        Self::SystemData::setup(res);
+
         SystemCommandSender::setup(res);
         SpatialEntitiesWrite::setup(res);
     }
 
-    pub fn process(&mut self, res: &Resources) {
+    fn run(&mut self, res: Self::SystemData) {
+        let res = res.res;
+
         let ops = {
             let mut connection = res.fetch_mut::<WorkerConnection>();
             connection.get_op_list(0)
@@ -139,38 +166,4 @@ impl SpatialReader {
             }
         }
     }
-}
-
-pub struct SpatialReaderSystemData;
-
-impl<'a> SystemData<'a> for SpatialReaderSystemData {
-    fn setup(res: &mut Resources) {
-        res.insert(SpatialReader::new());
-        SpatialReader::setup(res);
-    }
-
-    fn fetch(res: &'a Resources) -> Self {
-        res.fetch_mut::<SpatialReader>().process(res);
-        SpatialReaderSystemData {}
-    }
-
-    fn reads() -> Vec<ResourceId> {
-        vec![]
-    }
-
-    // TODO - accurately reflect reads and writes
-    fn writes() -> Vec<ResourceId> {
-        vec![
-            ResourceId::new::<EntitiesRes>(),
-            ResourceId::new::<SpatialReader>(),
-            ResourceId::new::<WorkerConnection>(),
-        ]
-    }
-}
-
-pub struct SpatialReaderSystem;
-impl<'a> System<'a> for SpatialReaderSystem {
-    type SystemData = SpatialReaderSystemData;
-
-    fn run(&mut self, _: SpatialReaderSystemData) {}
 }
