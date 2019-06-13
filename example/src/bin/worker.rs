@@ -1,7 +1,7 @@
 extern crate structopt;
 
-use example::{connection_handler::*, opt::*};
 use example::generated::{game, improbable};
+use example::{connection_handler::*, opt::*};
 use rand::Rng;
 use spatialos_sdk::worker::{
     commands::{EntityQueryRequest, ReserveEntityIdsRequest},
@@ -29,10 +29,10 @@ use spatialos_specs::entities::*;
 use spatialos_specs::system_commands::*;
 use spatialos_specs::*;
 
+use example::get_connection;
 use example::player_connection::*;
 use std::thread;
 use std::time::Duration;
-use example::get_connection;
 
 fn main() {
     let opt = Opt::from_args();
@@ -67,6 +67,6 @@ fn main() {
     loop {
         dispatcher.dispatch(&world.res);
 
-        thread::sleep(Duration::from_millis(1000))
+        thread::sleep(Duration::from_millis(30));
     }
 }

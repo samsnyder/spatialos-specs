@@ -161,10 +161,18 @@ impl<T: 'static + SpatialComponent + Sync + Send + Clone + Debug> ComponentDispa
         let request = command_request.get::<T>().unwrap().clone();
 
         match command_requests.get_mut(entity.into()) {
-            Some(requests) => requests.on_request(command_request.request_id, request),
+            Some(requests) => {
+                requests.on_request(command_request.request_id, 
+                    request, 
+                    command_request.caller_worker_id,
+                    command_request.caller_attribute_set);
+            }
             None => {
                 let mut requests: CommandResponder<T> = Default::default();
-                requests.on_request(command_request.request_id, request);
+                requests.on_request(command_request.request_id, 
+                    request, 
+                    command_request.caller_worker_id,
+                    command_request.caller_attribute_set);
                 command_requests.insert(entity.specs_entity(), requests);
             }
         }

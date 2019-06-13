@@ -4,10 +4,10 @@ use structopt::StructOpt;
 use spatialos_sdk::worker::snapshot::*;
 use specs::prelude::*;
 
-use spatialos_sdk::worker::*;
 use spatialos_sdk::worker::connection::WorkerConnection;
 use spatialos_sdk::worker::entity::Entity as WorkerEntity;
 use spatialos_sdk::worker::entity_builder::EntityBuilder;
+use spatialos_sdk::worker::*;
 use spatialos_specs::spatial_reader::*;
 use spatialos_specs::spatial_writer::*;
 use spatialos_specs::storage::*;
@@ -36,16 +36,20 @@ fn main() {
     let snapshot_path = path_buf.to_str().unwrap();
     println!("Creating snapshot at: {}", snapshot_path);
 
-    let mut stream = SnapshotOutputStream::new(snapshot_path).expect("Failed to create snapshot stream.");
+    let mut stream =
+        SnapshotOutputStream::new(snapshot_path).expect("Failed to create snapshot stream.");
 
-    println!("{:?}", stream.write_entity(EntityId::new(1), &create_player_creator_entity()));
+    println!(
+        "{:?}",
+        stream.write_entity(EntityId::new(1), &create_player_creator_entity())
+    );
 }
 
 fn create_player_creator_entity() -> WorkerEntity {
     let mut builder = EntityBuilder::new(0.0, 0.0, 0.0, "managed");
 
-    builder.add_component(PlayerCreator{}, "managed");
-    builder.add_component(Persistence{}, "managed");
+    builder.add_component(PlayerCreator {}, "managed");
+    builder.add_component(Persistence {}, "managed");
     builder.set_metadata("PlayerCreator", "managed");
     builder.set_entity_acl_write_access("managed");
 

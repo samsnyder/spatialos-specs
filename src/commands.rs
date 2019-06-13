@@ -23,7 +23,7 @@ use crate::entities::*;
 pub type CommandRequests<'a, T> = WriteStorage<'a, CommandResponder<T>>;
 
 pub struct CommandResponder<T: SpatialComponent> {
-	requests: Vec<(RequestId<IncomingCommandRequest>, T::CommandRequest)>,
+	requests: Vec<(RequestId<IncomingCommandRequest>, T::CommandRequest, String, Vec<String>)>,
 	responses: Vec<(RequestId<IncomingCommandRequest>, T::CommandResponse)>
 }
 
@@ -41,16 +41,21 @@ impl<T: 'static + SpatialComponent> Component for CommandResponder<T> {
 }
 
 impl<T: SpatialComponent> CommandResponder<T> {
-	pub(crate) fn on_request(&mut self, request_id: RequestId<IncomingCommandRequest>, request: T::CommandRequest) {
-		self.requests.push((request_id, request));
+	pub(crate) fn on_request(&mut self, 
+		request_id: RequestId<IncomingCommandRequest>, 
+		request: T::CommandRequest,
+		caller_worker_id: String,
+		caller_attribute_set: Vec<String>) {
+		self.requests.push((request_id, request, caller_worker_id, caller_attribute_set));
 	}
 
-	pub fn respond<F>(&mut self, mut responder: F) where F: FnMut(&T::CommandRequest) -> Option<T::CommandResponse> {
+	pub fn respond<F>(&mut self, mut responder: F) 
+		where F: FnMut(&T::CommandRequest, &String, &Vec<String>) -> Option<T::CommandResponse> {
 		let mut requests_left = Vec::new();
-		for (request_id, request) in self.requests.drain(..) {
-			match responder(&request) {
+		for (request_id, request, caller_worker_id, caller_attribute_set) in self.requests.drain(..) {
+			match responder(&request, &caller_worker_id, &caller_attribute_set) {
 				Some(response) => self.responses.push((request_id, response)),
-				None => requests_left.push((request_id, request))
+				None => requests_left.push((request_id, request, caller_worker_id, caller_attribute_set))
 			}
 		}
 
