@@ -5,8 +5,8 @@ use crate::entities::SpatialEntity;
 use crate::storage::{AuthorityBitSet, SpatialStorage, SpatialWriteStorage};
 use crate::SynchronisedComponent;
 use spatialos_sdk::worker::component::Component as SpatialComponent;
-use spatialos_sdk::worker::component::{ComponentId, UpdateParameters};
-use spatialos_sdk::worker::connection::{Connection, WorkerConnection};
+use spatialos_sdk::worker::component::ComponentId;
+use spatialos_sdk::worker::connection::WorkerConnection;
 use spatialos_sdk::worker::op::{
     AddComponentOp, AuthorityChangeOp, CommandRequestOp, CommandResponseOp, ComponentUpdateOp,
 };
@@ -129,7 +129,7 @@ impl<T: 'static + SpatialComponent + Sync + Send + Clone + Debug> ComponentDispa
         let mut storage: SpatialWriteStorage<T> = SpatialStorage::fetch(res);
         let update = component_update.get::<T>().unwrap().clone();
 
-        storage.get_mut(entity).unwrap().apply_update(update);
+        storage.get_mut(entity).unwrap().apply_update_to_value(update);
     }
 
     fn apply_authority_change<'b>(
@@ -184,13 +184,7 @@ impl<T: 'static + SpatialComponent + Sync + Send + Clone + Debug> ComponentDispa
         let mut storage: SpatialWriteStorage<T> = SpatialStorage::fetch(res);
 
         for (entity, component) in (&entities, &mut storage).join() {
-            if component.get_and_clear_dity_bit() {
-                connection.send_component_update::<T>(
-                    entity.entity_id(),
-                    component.to_update(),
-                    UpdateParameters::default(),
-                );
-            }
+            component.replicate(connection, entity.entity_id());
         }
 
         // Send queued command requests and responses

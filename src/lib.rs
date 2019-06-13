@@ -8,8 +8,10 @@ pub mod system_commands;
 
 use crate::component_registry::ComponentRegistry;
 use spatialos_sdk::worker::component::Component as SpatialComponent;
-use spatialos_sdk::worker::component::TypeConversion;
+use spatialos_sdk::worker::component::{TypeConversion, ComponentUpdate, UpdateParameters};
 use spatialos_sdk::worker::internal::schema::SchemaComponentUpdate;
+use spatialos_sdk::worker::connection::{WorkerConnection, Connection};
+use spatialos_sdk::worker::EntityId;
 use specs::prelude::{Component, Resources, SystemData, VecStorage, Write};
 use specs::shred::{Resource, ResourceId};
 use std::fmt::Debug;
@@ -19,25 +21,40 @@ use std::ops::{Deref, DerefMut};
 #[derive(Debug)]
 pub struct SynchronisedComponent<T: SpatialComponent + Debug> {
     value: T,
-    is_dirty: bool,
+    value_is_dirty: bool,
+    current_update: Option<T::Update>
 }
 
 impl<T: SpatialComponent + TypeConversion + Debug> SynchronisedComponent<T> {
     pub fn new(value: T) -> SynchronisedComponent<T> {
         SynchronisedComponent {
             value,
-            is_dirty: false,
+            value_is_dirty: false,
+            current_update: None
         }
     }
 
-    pub(crate) fn get_and_clear_dity_bit(&mut self) -> bool {
-        let is_dirty = self.is_dirty;
-        self.is_dirty = false;
-        is_dirty
+    pub(crate) fn replicate(&mut self, connection: &mut WorkerConnection, entity_id: EntityId) {
+        let update = {
+            if self.value_is_dirty {
+                self.value_is_dirty = false;
+                Some(self.to_update())
+            } else {
+                self.current_update.take()
+            }
+        };
+
+        if let Some(update) = update {
+            connection.send_component_update::<T>(
+                entity_id,
+                update,
+                UpdateParameters::default(),
+            );
+        }
     }
 
     // TODO - this is really bad as it seriliases then deserialises.
-    pub(crate) fn to_update(&self) -> T::Update {
+    fn to_update(&self) -> T::Update {
         let schema_update = SchemaComponentUpdate::new(T::ID);
         let mut fields = schema_update.fields();
         T::to_type(&self.value, &mut fields).unwrap();
@@ -45,8 +62,21 @@ impl<T: SpatialComponent + TypeConversion + Debug> SynchronisedComponent<T> {
         T::Update::from_type(&fields).unwrap()
     }
 
-    pub(crate) fn apply_update(&mut self, update: T::Update) {
+    pub(crate) fn apply_update_to_value(&mut self, update: T::Update) {
         self.value.merge(update);
+    }
+
+    pub fn apply_update(&mut self, update: T::Update) {
+        if self.value_is_dirty {
+            panic!("Attempt to apply update to component which has already been mutably dereferenced. Id {}", T::ID);
+        }
+
+        self.apply_update_to_value(update.clone());
+
+        match &mut self.current_update {
+            Some(current_update) => current_update.merge(update),
+            None => self.current_update = Some(update)
+        }
     }
 }
 
@@ -60,7 +90,11 @@ impl<T: SpatialComponent + Debug> Deref for SynchronisedComponent<T> {
 
 impl<T: SpatialComponent + Debug> DerefMut for SynchronisedComponent<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        self.is_dirty = true;
+        if self.current_update.is_some() {
+            panic!("Attempt to mutably dereference a component which has already had an update applied to it. Id {}", T::ID);
+        }
+
+        self.value_is_dirty = true;
         &mut self.value
     }
 }
