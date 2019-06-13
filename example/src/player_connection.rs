@@ -84,7 +84,10 @@ impl PlayerCreatorSys {
     fn create_player_entity(name: String) -> WorkerEntity {
         let mut builder = EntityBuilder::new(0.0, 0.0, 0.0, "managed");
 
-        builder.add_component(Player { name }, "managed");
+        builder.add_component(Player {
+            name,
+            current_direction: 0
+        }, "managed");
         builder.set_metadata("Player", "managed");
         builder.set_entity_acl_write_access("managed");
 

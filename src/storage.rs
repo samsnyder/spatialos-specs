@@ -1,25 +1,16 @@
+use crate::component_registry::ComponentRegistry;
+use crate::entities::SpatialEntity;
+use crate::SynchronisedComponent;
+use hibitset::{BitSet, BitSetAnd};
 use spatialos_sdk::worker::component::Component as SpatialComponent;
 use spatialos_sdk::worker::Authority;
-use specs::prelude::*;
-use specs::storage::*;
-use specs::world::*;
-
-use std::{
-    self,
-    marker::PhantomData,
-    ops::{Deref, DerefMut, Not},
-};
-
-use hibitset::{BitSet, BitSetAnd, BitSetLike, BitSetNot};
-use specs::shred::{CastFrom, Fetch, FetchMut, ResourceId};
-
 use specs::join::BitAnd;
-
-use crate::component_registry::*;
-use crate::spatial_reader::*;
-use crate::*;
-use crate::commands::*;
-use crate::entities::*;
+use specs::prelude::{Component, Join, ReadStorage, Resources, Storage, SystemData, WriteStorage};
+use specs::shred::{Fetch, FetchMut, ResourceId};
+use specs::storage::{AntiStorage, DistinctStorage, InsertResult, MaskedStorage};
+use specs::world::{EntitiesRes, Index};
+use std::marker::PhantomData;
+use std::ops::{Deref, DerefMut, Not};
 
 pub type SpatialReadStorage<'a, T> =
     SpatialStorage<'a, T, Fetch<'a, MaskedStorage<SynchronisedComponent<T>>>>;
@@ -69,7 +60,6 @@ where
     }
 }
 
-
 pub(crate) struct AuthorityBitSet<T: SpatialComponent> {
     mask: BitSet,
     _phantom: PhantomData<T>,
@@ -91,7 +81,6 @@ impl<T: SpatialComponent> AuthorityBitSet<T> {
         }
     }
 }
-
 
 /// A wrapper around the masked SpatialStorage and the generations vector.
 /// Can be used for safe lookup of components, insertions and removes.

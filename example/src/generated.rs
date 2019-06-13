@@ -59,37 +59,48 @@ impl TypeConversion for CreatePlayerResponse {
 #[derive(Debug, Clone)]
 pub struct Player {
     pub name: String,
+    pub current_direction: u32,
 }
 impl TypeConversion for Player {
     fn from_type(input: &SchemaObject) -> Result<Self, String> {
         Ok(Self {
             name: input.field::<SchemaString>(1).get_or_default(),
+            current_direction: input.field::<SchemaUint32>(2).get_or_default(),
         })
     }
     fn to_type(input: &Self, output: &mut SchemaObject) -> Result<(), String> {
         output.field::<SchemaString>(1).add(&&input.name);
+        output.field::<SchemaUint32>(2).add(input.current_direction);
         Ok(())
     }
 }
 impl ComponentData<Player> for Player {
     fn merge(&mut self, update: PlayerUpdate) {
         if let Some(value) = update.name { self.name = value; }
+        if let Some(value) = update.current_direction { self.current_direction = value; }
     }
 }
 
 #[derive(Debug, Clone, Default)]
 pub struct PlayerUpdate {
     pub name: Option<String>,
+    pub current_direction: Option<u32>,
 }
 impl TypeConversion for PlayerUpdate {
     fn from_type(input: &SchemaObject) -> Result<Self, String> {
         let mut output = Self {
             name: None,
+            current_direction: None,
         };
         let _field_name = input.field::<SchemaString>(1);
         if _field_name.count() > 0 {
             let field = &_field_name;
             output.name = Some(field.get_or_default());
+        }
+        let _field_current_direction = input.field::<SchemaUint32>(2);
+        if _field_current_direction.count() > 0 {
+            let field = &_field_current_direction;
+            output.current_direction = Some(field.get_or_default());
         }
         Ok(output)
     }
@@ -97,12 +108,16 @@ impl TypeConversion for PlayerUpdate {
         if let Some(ref value) = input.name {
             output.field::<SchemaString>(1).add(&value);
         }
+        if let Some(value) = input.current_direction {
+            output.field::<SchemaUint32>(2).add(value);
+        }
         Ok(())
     }
 }
 impl ComponentUpdate<Player> for PlayerUpdate {
     fn merge(&mut self, update: PlayerUpdate) {
         if update.name.is_some() { self.name = update.name; }
+        if update.current_direction.is_some() { self.current_direction = update.current_direction; }
     }
 }
 

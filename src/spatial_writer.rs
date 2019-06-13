@@ -1,18 +1,8 @@
-use crate::component_registry::*;
-use crate::system_commands::*;
-use crate::storage::*;
-use crate::*;
-use spatialos_sdk::worker::component::Component as SpatialComponent;
-use spatialos_sdk::worker::component::VTable;
-use spatialos_sdk::worker::component::{ComponentId, UpdateParameters};
-use spatialos_sdk::worker::connection::*;
-use spatialos_sdk::worker::op::*;
-use spatialos_sdk::worker::*;
-use specs::prelude::*;
-use specs::world::*;
-use std::collections::HashMap;
-use std::fmt::Debug;
-use std::marker::PhantomData;
+use crate::component_registry::ComponentRegistry;
+use crate::system_commands::SystemCommandSender;
+use spatialos_sdk::worker::connection::WorkerConnection;
+use specs::prelude::{Resources, System, SystemData};
+use specs::shred::ResourceId;
 
 pub struct SpatialWriter;
 

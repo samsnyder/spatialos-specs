@@ -31,6 +31,7 @@ use spatialos_specs::*;
 
 use example::get_connection;
 use example::player_connection::*;
+use example::player::*;
 use std::thread;
 use std::time::Duration;
 
@@ -58,6 +59,7 @@ fn main() {
             &[],
         )
         .with(PlayerCreatorSys, "", &[])
+        .with(MovePlayerSys, "", &[])
         .with_barrier()
         .with(SpatialWriterSystem, "writer", &[])
         .build();

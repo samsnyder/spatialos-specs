@@ -39,6 +39,7 @@ pub mod connection_handler;
 pub mod generated;
 pub mod opt;
 pub mod player_connection;
+pub mod player;
 
 pub use self::connection_handler::*;
 pub use self::opt::*;

@@ -1,26 +1,17 @@
-use crate::component_registry::*;
-use crate::system_commands::*;
-use crate::storage::*;
-use crate::entities::*;
-use crate::*;
-use spatialos_sdk::worker::component::Component as SpatialComponent;
-use spatialos_sdk::worker::component::VTable;
-use spatialos_sdk::worker::component::{ComponentId, UpdateParameters};
-use spatialos_sdk::worker::connection::*;
-use spatialos_sdk::worker::op::*;
-use specs::prelude::*;
-use specs::world::*;
-use std::collections::HashMap;
-use std::fmt::Debug;
-use std::marker::PhantomData;
+use crate::component_registry::ComponentRegistry;
+use crate::entities::{SpatialEntities, SpatialEntitiesWrite};
+use crate::system_commands::{SystemCommandSender, SystemCommandSenderImpl};
+use spatialos_sdk::worker::connection::{Connection, WorkerConnection};
+use spatialos_sdk::worker::op::WorkerOp;
+use specs::prelude::{Resources, System, SystemData};
+use specs::shred::ResourceId;
+use specs::world::EntitiesRes;
 
-pub struct SpatialReader {
-}
+pub struct SpatialReader {}
 
 impl SpatialReader {
     pub fn new() -> SpatialReader {
-        SpatialReader {
-        }
+        SpatialReader {}
     }
 
     pub fn setup(res: &mut Resources) {
@@ -49,7 +40,9 @@ impl SpatialReader {
                     {
                         None => {}
                         Some(interface) => {
-                            let entity = SpatialEntities::fetch(res).get_entity(add_component.entity_id).unwrap();
+                            let entity = SpatialEntities::fetch(res)
+                                .get_entity(add_component.entity_id)
+                                .unwrap();
                             interface.add_component(res, entity, add_component);
                         }
                     }
@@ -61,7 +54,9 @@ impl SpatialReader {
                     {
                         None => {}
                         Some(interface) => {
-                            let entity = SpatialEntities::fetch(res).get_entity(remove_component.entity_id).unwrap();
+                            let entity = SpatialEntities::fetch(res)
+                                .get_entity(remove_component.entity_id)
+                                .unwrap();
                             interface.remove_component(res, entity);
                         }
                     }
@@ -73,7 +68,9 @@ impl SpatialReader {
                     {
                         None => {}
                         Some(interface) => {
-                            let entity = SpatialEntities::fetch(res).get_entity(update.entity_id).unwrap();
+                            let entity = SpatialEntities::fetch(res)
+                                .get_entity(update.entity_id)
+                                .unwrap();
                             interface.apply_component_update(res, entity, update);
                         }
                     }
@@ -85,11 +82,13 @@ impl SpatialReader {
                     {
                         None => {}
                         Some(interface) => {
-                            let entity = SpatialEntities::fetch(res).get_entity(authority_change.entity_id).unwrap();
+                            let entity = SpatialEntities::fetch(res)
+                                .get_entity(authority_change.entity_id)
+                                .unwrap();
                             interface.apply_authority_change(res, entity, authority_change);
                         }
                     }
-                },
+                }
                 WorkerOp::CommandRequest(command_request) => {
                     match res
                         .fetch::<ComponentRegistry>()
@@ -97,7 +96,9 @@ impl SpatialReader {
                     {
                         None => {}
                         Some(interface) => {
-                            let entity = SpatialEntities::fetch(res).get_entity(command_request.entity_id).unwrap();
+                            let entity = SpatialEntities::fetch(res)
+                                .get_entity(command_request.entity_id)
+                                .unwrap();
                             interface.on_command_request(res, entity, command_request);
                         }
                     }
@@ -109,13 +110,15 @@ impl SpatialReader {
                     {
                         None => {}
                         Some(interface) => {
-                            let entity = SpatialEntities::fetch(res).get_entity(command_response.entity_id).unwrap();
-                            interface.on_command_response(res, entity, command_response);
+                            interface.on_command_response(res, command_response);
                         }
                     }
                 }
                 WorkerOp::CreateEntityResponse(create_entity_response) => {
-                    SystemCommandSenderImpl::got_create_entity_response(res, create_entity_response);
+                    SystemCommandSenderImpl::got_create_entity_response(
+                        res,
+                        create_entity_response,
+                    );
                 }
                 _ => {}
             }

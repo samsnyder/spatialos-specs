@@ -17,7 +17,7 @@
     "cloudDeployment": {
       "linux": {
         "localBuildDirectory": "./build/release/bin",
-        "command": "project-example",
+        "command": "worker",
         "arguments": [
           "--worker-id",
           "${IMPROBABLE_WORKER_ID}",
@@ -34,7 +34,7 @@
     "localDeployment": {
       "macos": {
         "localBuildDirectory": "./build/debug/bin",
-        "command": "project-example",
+        "command": "worker",
         "arguments": [
           "--worker-id",
           "${IMPROBABLE_WORKER_ID}",
@@ -49,7 +49,7 @@
       },
       "linux": {
         "localBuildDirectory": "./build/debug/bin",
-        "command": "project-example",
+        "command": "worker",
         "arguments": [
           "--worker-id",
           "${IMPROBABLE_WORKER_ID}",
@@ -64,7 +64,7 @@
       },
       "windows": {
         "localBuildDirectory": "./build/debug/bin",
-        "command": "project-example.exe",
+        "command": "worker.exe",
         "arguments": [
           "--worker-id",
           "${IMPROBABLE_WORKER_ID}",

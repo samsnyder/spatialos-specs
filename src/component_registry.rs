@@ -1,17 +1,19 @@
-use crate::storage::*;
-use crate::commands::*;
-use crate::*;
+use crate::commands::{
+    CommandRequests, CommandRequestsExt, CommandResponder, CommandSender, CommandSenderImpl,
+};
+use crate::entities::SpatialEntity;
+use crate::storage::{AuthorityBitSet, SpatialStorage, SpatialWriteStorage};
+use crate::SynchronisedComponent;
 use spatialos_sdk::worker::component::Component as SpatialComponent;
-use spatialos_sdk::worker::component::VTable;
 use spatialos_sdk::worker::component::{ComponentId, UpdateParameters};
-use spatialos_sdk::worker::connection::*;
-use spatialos_sdk::worker::op::*;
-use specs::prelude::*;
-use specs::world::*;
+use spatialos_sdk::worker::connection::{Connection, WorkerConnection};
+use spatialos_sdk::worker::op::{
+    AddComponentOp, AuthorityChangeOp, CommandRequestOp, CommandResponseOp, ComponentUpdateOp,
+};
+use specs::prelude::{Join, ReadStorage, Resources, Storage, SystemData, Write, WriteStorage};
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::marker::PhantomData;
-use crate::entities::*;
 
 pub(crate) struct ComponentRegistry {
     interfaces: HashMap<ComponentId, Box<ComponentDispatcherInterface + Send + Sync>>,
@@ -73,11 +75,7 @@ pub(crate) trait ComponentDispatcherInterface {
         entity: SpatialEntity,
         add_component: AddComponentOp,
     );
-    fn remove_component<'b>(
-        &self,
-        res: &Resources,
-        entity: SpatialEntity
-    );
+    fn remove_component<'b>(&self, res: &Resources, entity: SpatialEntity);
     fn apply_component_update<'b>(
         &self,
         res: &Resources,
@@ -96,12 +94,7 @@ pub(crate) trait ComponentDispatcherInterface {
         entity: SpatialEntity,
         command_request: CommandRequestOp,
     );
-    fn on_command_response<'b>(
-        &self,
-        res: &Resources,
-        entity: SpatialEntity,
-        command_response: CommandResponseOp,
-    );
+    fn on_command_response<'b>(&self, res: &Resources, command_response: CommandResponseOp);
     fn replicate(&self, res: &Resources, connection: &mut WorkerConnection);
 }
 
@@ -117,14 +110,12 @@ impl<T: 'static + SpatialComponent + Sync + Send + Clone + Debug> ComponentDispa
         let mut storage: SpatialWriteStorage<T> = SpatialStorage::fetch(res);
         let data = add_component.get::<T>().unwrap().clone();
 
-        storage.insert(entity, SynchronisedComponent::new(data)).unwrap();
+        storage
+            .insert(entity, SynchronisedComponent::new(data))
+            .unwrap();
     }
 
-    fn remove_component<'b>(
-        &self,
-        res: &Resources,
-        entity: SpatialEntity
-    ) {
+    fn remove_component<'b>(&self, res: &Resources, entity: SpatialEntity) {
         let mut storage: SpatialWriteStorage<T> = SpatialStorage::fetch(res);
         storage.remove(entity);
     }
@@ -162,28 +153,29 @@ impl<T: 'static + SpatialComponent + Sync + Send + Clone + Debug> ComponentDispa
 
         match command_requests.get_mut(entity.into()) {
             Some(requests) => {
-                requests.on_request(command_request.request_id, 
-                    request, 
+                requests.on_request(
+                    command_request.request_id,
+                    request,
                     command_request.caller_worker_id,
-                    command_request.caller_attribute_set);
+                    command_request.caller_attribute_set,
+                );
             }
             None => {
                 let mut requests: CommandResponder<T> = Default::default();
-                requests.on_request(command_request.request_id, 
-                    request, 
+                requests.on_request(
+                    command_request.request_id,
+                    request,
                     command_request.caller_worker_id,
-                    command_request.caller_attribute_set);
-                command_requests.insert(entity.specs_entity(), requests);
+                    command_request.caller_attribute_set,
+                );
+                command_requests
+                    .insert(entity.specs_entity(), requests)
+                    .expect("Error inserting new command request object.");
             }
         }
     }
 
-    fn on_command_response<'b>(
-        &self,
-        res: &Resources,
-        entity: SpatialEntity,
-        command_response: CommandResponseOp,
-    ) {
+    fn on_command_response<'b>(&self, res: &Resources, command_response: CommandResponseOp) {
         CommandSenderImpl::<T>::got_command_response(res, command_response);
     }
 

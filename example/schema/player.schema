@@ -18,4 +18,5 @@ component Player {
     id = 1002;
     
     string name = 1;
+    uint32 current_direction = 2;
 }

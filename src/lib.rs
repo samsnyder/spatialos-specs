@@ -1,23 +1,20 @@
-use spatialos_sdk::worker::component::Component as SpatialComponent;
-use spatialos_sdk::worker::component::TypeConversion;
-use spatialos_sdk::worker::internal::schema::SchemaComponentUpdate;
-use spatialos_sdk::worker::op::*;
-use spatialos_sdk::worker::EntityId;
-use specs::prelude::*;
-use specs::shred::{DefaultProvider, Fetch, Resource, ResourceId, SystemData};
-use specs::storage::MaskedStorage;
-use std::fmt::Debug;
-use std::marker::PhantomData;
-use std::ops::{Deref, DerefMut};
-use crate::component_registry::*;
-
+pub mod commands;
 mod component_registry;
+pub mod entities;
 pub mod spatial_reader;
 pub mod spatial_writer;
 pub mod storage;
-pub mod commands;
-pub mod entities;
 pub mod system_commands;
+
+use crate::component_registry::ComponentRegistry;
+use spatialos_sdk::worker::component::Component as SpatialComponent;
+use spatialos_sdk::worker::component::TypeConversion;
+use spatialos_sdk::worker::internal::schema::SchemaComponentUpdate;
+use specs::prelude::{Component, Resources, SystemData, VecStorage, Write};
+use specs::shred::{Resource, ResourceId};
+use std::fmt::Debug;
+use std::marker::PhantomData;
+use std::ops::{Deref, DerefMut};
 
 #[derive(Debug)]
 pub struct SynchronisedComponent<T: SpatialComponent + Debug> {
@@ -74,7 +71,7 @@ impl<T: 'static + SpatialComponent> Component for SynchronisedComponent<T> {
 
 pub struct WriteAndRegisterComponent<'a, T: 'a + Resource, C: SpatialComponent> {
     resource: Write<'a, T>,
-    phantom: PhantomData<C>
+    phantom: PhantomData<C>,
 }
 
 impl<'a, T, C: SpatialComponent> Deref for WriteAndRegisterComponent<'a, T, C>
@@ -100,7 +97,7 @@ where
 impl<'a, T, C: SpatialComponent> SystemData<'a> for WriteAndRegisterComponent<'a, T, C>
 where
     C: 'static + SpatialComponent,
-    T: Resource + Default
+    T: Resource + Default,
 {
     fn setup(res: &mut Resources) {
         ComponentRegistry::register_component::<C>(res);
@@ -110,7 +107,7 @@ where
     fn fetch(res: &'a Resources) -> Self {
         WriteAndRegisterComponent {
             resource: Write::fetch(res),
-            phantom: PhantomData
+            phantom: PhantomData,
         }
     }
 
