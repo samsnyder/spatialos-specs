@@ -1,4 +1,0 @@
-[submodule "spatialos-sdk-rs"]
-	path = spatialos-sdk-rs
-	url = https://github.com/jamiebrynes7/spatialos-sdk-rs.git
-	branch = feature/specs-integration
