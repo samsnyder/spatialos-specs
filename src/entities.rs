@@ -1,13 +1,13 @@
 use spatialos_sdk::worker::EntityId;
 use specs::prelude::{
-    Component, Entities, Entity, Join, Read, ReadStorage, Resources, SystemData, VecStorage, Write,
+    Component, Entities, Entity, Join, Read, ReadStorage, Resources, SystemData, VecStorage,
     WriteStorage,
 };
-use specs::shred::{Fetch, FetchMut, ResourceId};
+use specs::shred::{Fetch, ResourceId};
 use specs::storage::MaskedStorage;
 use specs::world::Index;
 use std::collections::HashMap;
-use std::ops::{Deref, DerefMut};
+use std::ops::Deref;
 
 // This must stay immutable
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -43,11 +43,6 @@ impl From<SpatialEntity> for Entity {
     }
 }
 
-pub type SpatialEntities<'a> =
-    SpatialEntitiesSystemData<Fetch<'a, SpatialEntitiesRes>, ReadStorage<'a, SpatialEntity>>;
-pub(crate) type SpatialEntitiesWrite<'a> =
-    SpatialEntitiesSystemData<FetchMut<'a, SpatialEntitiesRes>, WriteStorage<'a, SpatialEntity>>;
-
 #[derive(Debug, Default)]
 pub struct SpatialEntitiesRes {
     entities: HashMap<EntityId, SpatialEntity>,
@@ -80,23 +75,19 @@ impl SpatialEntitiesRes {
     }
 }
 
+pub type SpatialEntities<'a> = SpatialEntitiesSystemData<'a>;
+
 #[doc(hidden)]
-pub struct SpatialEntitiesSystemData<F, T> {
-    spatial_entities_res: F,
-    entity_id_storage: T,
+pub struct SpatialEntitiesSystemData<'a> {
+    spatial_entities_res: Fetch<'a, SpatialEntitiesRes>,
+    entity_id_storage: ReadStorage<'a, SpatialEntity>,
 }
 
-impl<F, T> Deref for SpatialEntitiesSystemData<F, T> {
-    type Target = F;
+impl<'a> Deref for SpatialEntitiesSystemData<'a> {
+    type Target = Fetch<'a, SpatialEntitiesRes>;
 
     fn deref(&self) -> &Self::Target {
         &self.spatial_entities_res
-    }
-}
-
-impl<F, T> DerefMut for SpatialEntitiesSystemData<F, T> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.spatial_entities_res
     }
 }
 
@@ -125,32 +116,7 @@ impl<'a> SystemData<'a> for SpatialEntities<'a> {
     }
 }
 
-impl<'a> SystemData<'a> for SpatialEntitiesWrite<'a> {
-    fn setup(res: &mut Resources) {
-        Write::<SpatialEntitiesRes>::setup(res);
-        WriteStorage::<SpatialEntity>::setup(res);
-    }
-
-    fn fetch(res: &'a Resources) -> Self {
-        SpatialEntitiesSystemData {
-            spatial_entities_res: res.fetch_mut(),
-            entity_id_storage: WriteStorage::<'a, SpatialEntity>::fetch(res),
-        }
-    }
-
-    fn reads() -> Vec<ResourceId> {
-        vec![]
-    }
-
-    fn writes() -> Vec<ResourceId> {
-        vec![
-            ResourceId::new::<SpatialEntitiesRes>(),
-            ResourceId::new::<MaskedStorage<SpatialEntity>>(),
-        ]
-    }
-}
-
-impl<'a> Join for &'a SpatialEntities<'a> {
+impl<'a> Join for &'a SpatialEntitiesSystemData<'a> {
     type Type = <&'a ReadStorage<'a, SpatialEntity> as Join>::Type;
     type Value = <&'a ReadStorage<'a, SpatialEntity> as Join>::Value;
     type Mask = <&'a ReadStorage<'a, SpatialEntity> as Join>::Mask;
