@@ -27,8 +27,8 @@ impl<'a> System<'a> for ClientBootstrap {
                             name: "MyName".to_string(),
                         }),
                         |result| {
-                            result.get_system_data::<_, Self>(|(_, _entities, _)| {
-                                match &*result {
+                            result.get_system_data::<_, Self>(|(_, _entities, _), result| {
+                                match result {
                                     Ok(result) => println!("Created player: {:?}", result),
                                     Err(status) => println!("Error creating player: {:?}", status),
                                 }
@@ -54,23 +54,23 @@ impl<'a> System<'a> for PlayerCreatorSys {
                     let player_name = request.name.clone();
                     let caller_worker_id = caller_worker_id.clone();
 
-                    sys_command_sender.reserve_entity_ids(1, move |res, result| {
-                        let (_, mut sys_command_sender) = <Self as System>::SystemData::fetch(res);
+                    sys_command_sender.reserve_entity_ids(1, move |result| {
+                        result.get_system_data::<_, Self>(|(_, mut sys_command_sender), result| {
+                            let entity = Self::create_player_entity(player_name);
 
-                        let entity = Self::create_player_entity(player_name);
+                            let reserved_id = result.unwrap().next().unwrap();
 
-                        let reserved_id = result.unwrap().next().unwrap();
-
-                        sys_command_sender.create_entity(
-                            entity,
-                            Some(reserved_id),
-                            move |_res, result| {
-                                println!(
-                                    "Created player entity for {}: {:?}",
-                                    caller_worker_id, result
-                                );
-                            },
-                        );
+                            sys_command_sender.create_entity(
+                                entity,
+                                Some(reserved_id),
+                                move |result| {
+                                    println!(
+                                        "Created player entity for {}: {:?}",
+                                        caller_worker_id, &*result
+                                    );
+                                },
+                            );
+                        })
                     });
 
                     Some(PlayerCreatorCommandResponse::CreatePlayer(

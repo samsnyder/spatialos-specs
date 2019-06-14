@@ -1,4 +1,5 @@
 use crate::component_registry::WriteAndRegisterComponent;
+use crate::ValueWithSystemData;
 use spatialos_sdk::worker::commands::{IncomingCommandRequest, OutgoingCommandRequest};
 use spatialos_sdk::worker::component::Component as WorkerComponent;
 use spatialos_sdk::worker::connection::{Connection, WorkerConnection};
@@ -7,10 +8,9 @@ use spatialos_sdk::worker::op::{
 };
 use spatialos_sdk::worker::{EntityId, RequestId};
 use specs::prelude::{
-    Component, Entities, Entity, HashMapStorage, Join, Resources, SystemData, WriteStorage, System
+    Component, Entities, Entity, HashMapStorage, Join, Resources, SystemData, WriteStorage,
 };
 use std::collections::HashMap;
-use std::ops::Deref;
 
 pub type CommandRequests<'a, T> = WriteStorage<'a, CommandRequestsComp<T>>;
 
@@ -98,30 +98,10 @@ impl<'a, T: 'static + WorkerComponent> CommandRequestsExt for CommandRequests<'a
     }
 }
 
-pub struct CommandResponse<'a, T: WorkerComponent> {
-    res: &'a Resources,
-    response: Result<&'a T::CommandResponse, StatusCode<WorkerCommandResponse<'a>>>,
-}
-
-impl<'a, T: WorkerComponent> CommandResponse<'a, T> {
-    pub fn get_system_data<F, S>(&self, cb: F)
-    where
-        S: System<'a>,
-        S::SystemData: SystemData<'a> + 'a,
-        F: 'a
-            + FnOnce(S::SystemData),
-    {
-        cb(S::SystemData::fetch(self.res));
-    }
-}
-
-impl<'a, T: WorkerComponent> Deref for CommandResponse<'a, T> {
-    type Target = Result<&'a T::CommandResponse, StatusCode<WorkerCommandResponse<'a>>>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.response
-    }
-}
+pub type CommandResponse<'a, T> = ValueWithSystemData<
+    'a,
+    Result<&'a <T as WorkerComponent>::CommandResponse, StatusCode<WorkerCommandResponse<'a>>>,
+>;
 
 pub type CommandSender<'a, T> = WriteAndRegisterComponent<'a, CommandSenderRes<T>, T>;
 
@@ -143,14 +123,14 @@ impl<T: 'static + WorkerComponent> CommandSenderRes<T> {
             Box::new(|res, response_op| match response_op.response {
                 StatusCode::Success(response) => {
                     let response = response.get::<T>().unwrap();
-                    callback(CommandResponse {
+                    callback(CommandResponse::<T> {
                         res,
-                        response: Ok(response),
+                        value: Ok(response),
                     })
                 }
-                other => callback(CommandResponse {
+                other => callback(CommandResponse::<T> {
                     res,
-                    response: Err(other),
+                    value: Err(other),
                 }),
             }),
         ));

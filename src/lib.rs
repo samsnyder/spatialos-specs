@@ -10,6 +10,7 @@ pub use commands::{CommandRequests, CommandSender};
 pub use entities::{SpatialEntities, SpatialEntity};
 pub use spatial_reader::SpatialReaderSystem;
 pub use spatial_writer::SpatialWriterSystem;
+pub use std::ops::{Deref, DerefMut};
 pub use storage::{SpatialReadStorage, SpatialWriteStorage};
 pub use system_commands::SystemCommandSender;
 
@@ -18,9 +19,8 @@ use spatialos_sdk::worker::component::{ComponentUpdate, TypeConversion, UpdatePa
 use spatialos_sdk::worker::connection::{Connection, WorkerConnection};
 use spatialos_sdk::worker::internal::schema::SchemaComponentUpdate;
 use spatialos_sdk::worker::EntityId;
-use specs::prelude::{Component, VecStorage};
+use specs::prelude::{Component, Resources, System, SystemData, VecStorage};
 use std::fmt::Debug;
-use std::ops::{Deref, DerefMut};
 
 #[derive(Debug)]
 pub struct SpatialComponent<T: WorkerComponent + Debug> {
@@ -101,4 +101,34 @@ impl<T: WorkerComponent + Debug> DerefMut for SpatialComponent<T> {
 
 impl<T: 'static + WorkerComponent> Component for SpatialComponent<T> {
     type Storage = VecStorage<Self>;
+}
+
+pub struct ValueWithSystemData<'a, T> {
+    res: &'a Resources,
+    value: T,
+}
+
+impl<'a, T> Deref for ValueWithSystemData<'a, T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        &self.value
+    }
+}
+
+impl<'a, T> DerefMut for ValueWithSystemData<'a, T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.value
+    }
+}
+
+impl<'a, T> ValueWithSystemData<'a, T> {
+    pub fn get_system_data<F, S>(self, cb: F)
+    where
+        S: System<'a>,
+        S::SystemData: SystemData<'a> + 'a,
+        F: 'a + FnOnce(S::SystemData, T),
+    {
+        cb(S::SystemData::fetch(self.res), self.value);
+    }
 }

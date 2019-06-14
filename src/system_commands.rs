@@ -1,3 +1,4 @@
+use crate::ValueWithSystemData;
 use spatialos_sdk::worker::commands::{
     CreateEntityRequest, DeleteEntityRequest, EntityQueryRequest, ReserveEntityIdsRequest,
 };
@@ -13,6 +14,8 @@ use specs::prelude::{Resources, SystemData, Write};
 use std::collections::HashMap;
 
 pub type SystemCommandSender<'a> = Write<'a, SystemCommandSenderRes>;
+
+pub type SystemCommandResponse<'a, T> = ValueWithSystemData<'a, Result<T, StatusCode<T>>>;
 
 type IntermediateCallback<O> = Box<FnOnce(&Resources, O) + Send + Sync>;
 
@@ -45,18 +48,15 @@ pub struct SystemCommandSenderRes {
 impl SystemCommandSenderRes {
     pub fn reserve_entity_ids<F>(&mut self, number: u32, callback: F)
     where
-        F: 'static
-            + FnOnce(&Resources, Result<ReservedEntityIdRange, StatusCode<ReservedEntityIdRange>>)
-            + Send
-            + Sync,
+        F: 'static + FnOnce(SystemCommandResponse<ReservedEntityIdRange>) + Send + Sync,
     {
         self.buffered_reserve_entity_ids_requests.push((
             number,
             Box::new(|res, response_op| {
-                callback(
+                callback(SystemCommandResponse {
                     res,
-                    SystemCommandSenderRes::status_code_to_result(response_op.status_code),
-                );
+                    value: SystemCommandSenderRes::status_code_to_result(response_op.status_code),
+                });
             }),
         ));
     }
@@ -67,49 +67,46 @@ impl SystemCommandSenderRes {
         reserved_entity_id: Option<EntityId>,
         callback: F,
     ) where
-        F: 'static + FnOnce(&Resources, Result<EntityId, StatusCode<EntityId>>) + Send + Sync,
+        F: 'static + FnOnce(SystemCommandResponse<EntityId>) + Send + Sync,
     {
         self.buffered_create_entity_requests.push((
             NoAccessContainer::new(entity),
             reserved_entity_id,
             Box::new(|res, response_op| {
-                callback(
+                callback(SystemCommandResponse {
                     res,
-                    SystemCommandSenderRes::status_code_to_result(response_op.status_code),
-                );
+                    value: SystemCommandSenderRes::status_code_to_result(response_op.status_code),
+                });
             }),
         ));
     }
 
     pub fn delete_entity<F>(&mut self, entity_id: EntityId, callback: F)
     where
-        F: 'static + FnOnce(&Resources, Result<(), StatusCode<()>>) + Send + Sync,
+        F: 'static + FnOnce(SystemCommandResponse<()>) + Send + Sync,
     {
         self.buffered_delete_entity_requests.push((
             entity_id,
             Box::new(|res, response_op| {
-                callback(
+                callback(SystemCommandResponse {
                     res,
-                    SystemCommandSenderRes::status_code_to_result(response_op.status_code),
-                );
+                    value: SystemCommandSenderRes::status_code_to_result(response_op.status_code),
+                });
             }),
         ));
     }
 
     pub fn entity_query<F>(&mut self, query: EntityQuery, callback: F)
     where
-        F: 'static
-            + FnOnce(&Resources, Result<QueryResponse, StatusCode<QueryResponse>>)
-            + Send
-            + Sync,
+        F: 'static + FnOnce(SystemCommandResponse<QueryResponse>) + Send + Sync,
     {
         self.buffered_entity_query_requests.push((
             query,
             Box::new(|res, response_op| {
-                callback(
+                callback(SystemCommandResponse {
                     res,
-                    SystemCommandSenderRes::status_code_to_result(response_op.status_code),
-                );
+                    value: SystemCommandSenderRes::status_code_to_result(response_op.status_code),
+                });
             }),
         ));
     }
