@@ -11,7 +11,7 @@ pub use entities::{SpatialEntities, SpatialEntity};
 pub use spatial_reader::SpatialReaderSystem;
 pub use spatial_writer::SpatialWriterSystem;
 pub use std::ops::{Deref, DerefMut};
-pub use storage::{SpatialReadStorage, SpatialWriteStorage};
+pub use storage::{SpatialReadStorage, SpatialWriteStorage, SpatialWriteStorage2};
 pub use system_commands::SystemCommandSender;
 
 use spatialos_sdk::worker::component::Component as WorkerComponent;
@@ -21,6 +21,7 @@ use spatialos_sdk::worker::internal::schema::SchemaComponentUpdate;
 use spatialos_sdk::worker::EntityId;
 use specs::prelude::{Component, Resources, System, SystemData, VecStorage};
 use std::fmt::Debug;
+use crate::storage::SpatialUnprotectedStorage;
 
 /// A wrapper for a SpatialOS component data.
 ///
@@ -116,7 +117,7 @@ impl<T: WorkerComponent + Debug> DerefMut for SpatialComponent<T> {
 }
 
 impl<T: 'static + WorkerComponent> Component for SpatialComponent<T> {
-    type Storage = VecStorage<Self>;
+    type Storage = SpatialUnprotectedStorage<T, VecStorage<Self>>;
 }
 
 /// Represents a value along with the ability to get a system's `SystemData`.

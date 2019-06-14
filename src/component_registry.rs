@@ -17,6 +17,8 @@ use std::fmt::Debug;
 use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
 
+static mut COMPONENT_REGISTRY: Option<ComponentRegistry> = None;
+
 pub(crate) struct ComponentRegistry {
     interfaces: HashMap<ComponentId, Box<ComponentDispatcherInterface + Send + Sync>>,
 }
@@ -30,41 +32,44 @@ impl Default for ComponentRegistry {
 }
 
 impl ComponentRegistry {
-    pub(crate) fn register_component<T: 'static + WorkerComponent>(res: &mut Resources) {
-        // Create component data storage.
-        WriteStorage::<SpatialComponent<T>>::setup(res);
-
-        // Create command sender resource.
-        Write::<CommandSenderRes<T>>::setup(res);
-
-        // Create command receiver storage.
-        CommandRequests::<T>::setup(res);
-
-        res.entry::<ComponentRegistry>()
-            .or_insert_with(|| Default::default())
-            .register_component_on_self::<T>();
-
-        res.insert(AuthorityBitSet::<T>::new());
+    unsafe fn get_registry() -> &'static ComponentRegistry {
+        COMPONENT_REGISTRY.get_or_insert_with(|| Default::default())
     }
 
-    fn register_component_on_self<T: 'static + WorkerComponent>(&mut self) {
-        let interface = ComponentDispatcher::<T> {
-            _phantom: PhantomData,
-        };
-        self.interfaces.insert(T::ID, Box::new(interface));
+    unsafe fn get_registry_mut() -> &'static mut ComponentRegistry {
+        COMPONENT_REGISTRY.get_or_insert_with(|| Default::default())
+    }
+
+    pub(crate) fn register_component<T: 'static + WorkerComponent>() {
+        println!("REGISTER: {:?}", T::ID);
+        unsafe {
+            let interface = ComponentDispatcher::<T> {
+                _phantom: PhantomData,
+            };
+            Self::get_registry_mut()
+                .interfaces
+                .insert(T::ID, Box::new(interface));
+        }
+    }
+
+    pub(crate) fn setup_components(res: &mut Resources) {
+        unsafe {
+            for interface in Self::get_registry().interfaces.values() {
+                interface.setup_component(res);
+            }
+        }
     }
 
     pub(crate) fn get_interface(
-        &self,
         component_id: ComponentId,
-    ) -> Option<&Box<ComponentDispatcherInterface + Send + Sync>> {
-        self.interfaces.get(&component_id)
+    ) -> Option<&'static Box<ComponentDispatcherInterface + Send + Sync>> {
+        unsafe { Self::get_registry().interfaces.get(&component_id) }
     }
 
     pub(crate) fn interfaces_iter(
-        &self,
-    ) -> impl Iterator<Item = &Box<ComponentDispatcherInterface + Send + Sync>> {
-        self.interfaces.values()
+    ) -> impl Iterator<Item = &'static Box<ComponentDispatcherInterface + Send + Sync + 'static>>
+    {
+        unsafe { Self::get_registry().interfaces.values() }
     }
 }
 
@@ -73,6 +78,7 @@ struct ComponentDispatcher<T: 'static + WorkerComponent + Sync + Send + Clone + 
 }
 
 pub(crate) trait ComponentDispatcherInterface {
+    fn setup_component(&self, res: &mut Resources);
     fn add_component<'b>(
         &self,
         res: &Resources,
@@ -105,6 +111,19 @@ pub(crate) trait ComponentDispatcherInterface {
 impl<T: 'static + WorkerComponent + Sync + Send + Clone + Debug> ComponentDispatcherInterface
     for ComponentDispatcher<T>
 {
+    fn setup_component(&self, res: &mut Resources) {
+        // Create component data storage.
+        WriteStorage::<SpatialComponent<T>>::setup(res);
+
+        // Create command sender resource.
+        Write::<CommandSenderRes<T>>::setup(res);
+
+        // Create command receiver storage.
+        CommandRequests::<T>::setup(res);
+
+        res.insert(AuthorityBitSet::<T>::new());
+    }
+
     fn add_component<'b>(
         &self,
         res: &Resources,
@@ -204,53 +223,53 @@ impl<T: 'static + WorkerComponent + Sync + Send + Clone + Debug> ComponentDispat
     }
 }
 
-pub struct WriteAndRegisterComponent<'a, T: 'a + Resource, C: WorkerComponent> {
-    resource: Write<'a, T>,
-    phantom: PhantomData<C>,
-}
+// pub struct WriteAndRegisterComponent<'a, T: 'a + Resource, C: WorkerComponent> {
+//     resource: Write<'a, T>,
+//     phantom: PhantomData<C>,
+// }
 
-impl<'a, T, C: WorkerComponent> Deref for WriteAndRegisterComponent<'a, T, C>
-where
-    T: Resource,
-{
-    type Target = T;
+// impl<'a, T, C: WorkerComponent> Deref for WriteAndRegisterComponent<'a, T, C>
+// where
+//     T: Resource,
+// {
+//     type Target = T;
 
-    fn deref(&self) -> &T {
-        self.resource.deref()
-    }
-}
+//     fn deref(&self) -> &T {
+//         self.resource.deref()
+//     }
+// }
 
-impl<'a, T, C: WorkerComponent> DerefMut for WriteAndRegisterComponent<'a, T, C>
-where
-    T: Resource,
-{
-    fn deref_mut(&mut self) -> &mut T {
-        self.resource.deref_mut()
-    }
-}
+// impl<'a, T, C: WorkerComponent> DerefMut for WriteAndRegisterComponent<'a, T, C>
+// where
+//     T: Resource,
+// {
+//     fn deref_mut(&mut self) -> &mut T {
+//         self.resource.deref_mut()
+//     }
+// }
 
-impl<'a, T, C: WorkerComponent> SystemData<'a> for WriteAndRegisterComponent<'a, T, C>
-where
-    C: 'static + WorkerComponent,
-    T: Resource + Default,
-{
-    fn setup(res: &mut Resources) {
-        ComponentRegistry::register_component::<C>(res);
-        Write::<T>::setup(res);
-    }
+// impl<'a, T, C: WorkerComponent> SystemData<'a> for WriteAndRegisterComponent<'a, T, C>
+// where
+//     C: 'static + WorkerComponent,
+//     T: Resource + Default,
+// {
+//     fn setup(res: &mut Resources) {
+//         ComponentRegistry::register_component::<C>(res);
+//         Write::<T>::setup(res);
+//     }
 
-    fn fetch(res: &'a Resources) -> Self {
-        WriteAndRegisterComponent {
-            resource: Write::fetch(res),
-            phantom: PhantomData,
-        }
-    }
+//     fn fetch(res: &'a Resources) -> Self {
+//         WriteAndRegisterComponent {
+//             resource: Write::fetch(res),
+//             phantom: PhantomData,
+//         }
+//     }
 
-    fn reads() -> Vec<ResourceId> {
-        Write::<T>::reads()
-    }
+//     fn reads() -> Vec<ResourceId> {
+//         Write::<T>::reads()
+//     }
 
-    fn writes() -> Vec<ResourceId> {
-        Write::<T>::writes()
-    }
-}
+//     fn writes() -> Vec<ResourceId> {
+//         Write::<T>::writes()
+//     }
+// }

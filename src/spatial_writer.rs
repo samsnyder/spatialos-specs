@@ -2,7 +2,7 @@ use crate::component_registry::ComponentRegistry;
 use crate::spatial_reader::ResourcesSystemData;
 use crate::system_commands::SystemCommandSender;
 use spatialos_sdk::worker::connection::WorkerConnection;
-use specs::prelude::{System, WriteExpect};
+use specs::prelude::{Resources, System, SystemData, WriteExpect};
 
 /// A system which replicates changes in the local world to SpatialOS.
 ///
@@ -37,8 +37,14 @@ impl<'a> System<'a> for SpatialWriterSystem {
         ResourcesSystemData<'a>,
     );
 
+    fn setup(&mut self, res: &mut Resources) {
+        Self::SystemData::setup(res);
+
+        ComponentRegistry::setup_components(res);
+    }
+
     fn run(&mut self, (mut connection, mut system_command_sender, res): Self::SystemData) {
-        for interface in res.res.fetch::<ComponentRegistry>().interfaces_iter() {
+        for interface in ComponentRegistry::interfaces_iter() {
             interface.replicate(&res.res, &mut connection);
         }
 

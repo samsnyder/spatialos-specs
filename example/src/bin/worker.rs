@@ -26,15 +26,16 @@ fn main() {
     let mut dispatcher = DispatcherBuilder::new()
         .with(SpatialReaderSystem, "reader", &[])
         .with_barrier()
-        .with(
-            ClientBootstrap {
-                has_requested_player: false,
-            },
-            "",
-            &[],
-        )
-        .with(PlayerCreatorSys, "", &[])
-        .with(MovePlayerSys, "", &[])
+        .with(OtherSys{has_requested_player: false}, "", &[])
+        // .with(
+        //     ClientBootstrap {
+        //         has_requested_player: false,
+        //     },
+        //     "",
+        //     &[],
+        // )
+        // .with(PlayerCreatorSys, "", &[])
+        // .with(MovePlayerSys, "", &[])
         .with_barrier()
         .with(SpatialWriterSystem, "writer", &[])
         .build();

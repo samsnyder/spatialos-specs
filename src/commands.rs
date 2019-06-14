@@ -1,4 +1,4 @@
-use crate::component_registry::WriteAndRegisterComponent;
+use crate::component_registry::ComponentRegistry;
 use crate::ValueWithSystemData;
 use spatialos_sdk::worker::commands::{IncomingCommandRequest, OutgoingCommandRequest};
 use spatialos_sdk::worker::component::Component as WorkerComponent;
@@ -8,7 +8,7 @@ use spatialos_sdk::worker::op::{
 };
 use spatialos_sdk::worker::{EntityId, RequestId};
 use specs::prelude::{
-    Component, Entities, Entity, HashMapStorage, Join, Resources, SystemData, WriteStorage,
+    Component, Entities, Entity, HashMapStorage, Join, Resources, SystemData, Write, WriteStorage,
 };
 use std::collections::HashMap;
 
@@ -37,7 +37,7 @@ impl<T: 'static + WorkerComponent> Component for CommandRequestsComp<T> {
     type Storage = HashMapStorage<Self>;
 }
 
-impl<T: WorkerComponent> CommandRequestsComp<T> {
+impl<T: 'static + WorkerComponent> CommandRequestsComp<T> {
     pub(crate) fn on_request(
         &mut self,
         request_id: RequestId<IncomingCommandRequest>,
@@ -103,7 +103,7 @@ pub type CommandResponse<'a, T> = ValueWithSystemData<
     Result<&'a <T as WorkerComponent>::CommandResponse, StatusCode<WorkerCommandResponse<'a>>>,
 >;
 
-pub type CommandSender<'a, T> = WriteAndRegisterComponent<'a, CommandSenderRes<T>, T>;
+pub type CommandSender<'a, T> = Write<'a, CommandSenderRes<T>>;
 
 type CommandIntermediateCallback = Box<FnOnce(&Resources, CommandResponseOp) + Send + Sync>;
 
@@ -159,8 +159,9 @@ impl<T: 'static + WorkerComponent> CommandSenderRes<T> {
     }
 }
 
-impl<T: WorkerComponent> Default for CommandSenderRes<T> {
+impl<T: 'static + WorkerComponent> Default for CommandSenderRes<T> {
     fn default() -> Self {
+        ComponentRegistry::register_component::<T>();
         CommandSenderRes {
             callbacks: HashMap::new(),
             buffered_requests: Vec::new(),

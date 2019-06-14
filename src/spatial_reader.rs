@@ -63,10 +63,7 @@ impl<'a> System<'a> for SpatialReaderSystem {
                         .remove_entity(res, remove_entity_op.entity_id);
                 }
                 WorkerOp::AddComponent(add_component) => {
-                    match res
-                        .fetch::<ComponentRegistry>()
-                        .get_interface(add_component.component_id)
-                    {
+                    match ComponentRegistry::get_interface(add_component.component_id) {
                         None => {}
                         Some(interface) => {
                             let entity = SpatialEntities::fetch(res)
@@ -77,10 +74,7 @@ impl<'a> System<'a> for SpatialReaderSystem {
                     }
                 }
                 WorkerOp::RemoveComponent(remove_component) => {
-                    match res
-                        .fetch::<ComponentRegistry>()
-                        .get_interface(remove_component.component_id)
-                    {
+                    match ComponentRegistry::get_interface(remove_component.component_id) {
                         None => {}
                         Some(interface) => {
                             let entity = SpatialEntities::fetch(res)
@@ -91,10 +85,7 @@ impl<'a> System<'a> for SpatialReaderSystem {
                     }
                 }
                 WorkerOp::ComponentUpdate(update) => {
-                    match res
-                        .fetch::<ComponentRegistry>()
-                        .get_interface(update.component_id)
-                    {
+                    match ComponentRegistry::get_interface(update.component_id) {
                         None => {}
                         Some(interface) => {
                             let entity = SpatialEntities::fetch(res)
@@ -105,10 +96,7 @@ impl<'a> System<'a> for SpatialReaderSystem {
                     }
                 }
                 WorkerOp::AuthorityChange(authority_change) => {
-                    match res
-                        .fetch::<ComponentRegistry>()
-                        .get_interface(authority_change.component_id)
-                    {
+                    match ComponentRegistry::get_interface(authority_change.component_id) {
                         None => {}
                         Some(interface) => {
                             let entity = SpatialEntities::fetch(res)
@@ -119,10 +107,7 @@ impl<'a> System<'a> for SpatialReaderSystem {
                     }
                 }
                 WorkerOp::CommandRequest(command_request) => {
-                    match res
-                        .fetch::<ComponentRegistry>()
-                        .get_interface(command_request.component_id)
-                    {
+                    match ComponentRegistry::get_interface(command_request.component_id) {
                         None => {}
                         Some(interface) => {
                             let entity = SpatialEntities::fetch(res)
@@ -133,10 +118,7 @@ impl<'a> System<'a> for SpatialReaderSystem {
                     }
                 }
                 WorkerOp::CommandResponse(command_response) => {
-                    match res
-                        .fetch::<ComponentRegistry>()
-                        .get_interface(command_response.component_id)
-                    {
+                    match ComponentRegistry::get_interface(command_response.component_id) {
                         None => {}
                         Some(interface) => {
                             interface.on_command_response(res, command_response);
