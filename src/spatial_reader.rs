@@ -1,5 +1,5 @@
 use crate::component_registry::ComponentRegistry;
-use crate::entities::{SpatialEntitiesRes, SpatialEntities};
+use crate::entities::{SpatialEntities, SpatialEntitiesRes};
 use crate::system_commands::{SystemCommandSender, SystemCommandSenderRes};
 use spatialos_sdk::worker::connection::{Connection, WorkerConnection};
 use spatialos_sdk::worker::op::WorkerOp;
@@ -55,10 +55,12 @@ impl<'a> System<'a> for SpatialReaderSystem {
         for op in &ops {
             match op {
                 WorkerOp::AddEntity(add_entity_op) => {
-                    res.fetch_mut::<SpatialEntitiesRes>().got_new_entity(res, add_entity_op.entity_id);
+                    res.fetch_mut::<SpatialEntitiesRes>()
+                        .got_new_entity(res, add_entity_op.entity_id);
                 }
                 WorkerOp::RemoveEntity(remove_entity_op) => {
-                    res.fetch_mut::<SpatialEntitiesRes>().remove_entity(res, remove_entity_op.entity_id);
+                    res.fetch_mut::<SpatialEntitiesRes>()
+                        .remove_entity(res, remove_entity_op.entity_id);
                 }
                 WorkerOp::AddComponent(add_component) => {
                     match res

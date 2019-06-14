@@ -1,11 +1,11 @@
-use std::path::PathBuf;
-use structopt::StructOpt;
-use spatialos_sdk::worker::snapshot::*;
-use spatialos_sdk::worker::entity::Entity as WorkerEntity;
-use spatialos_sdk::worker::entity_builder::EntityBuilder;
-use spatialos_sdk::worker::*;
 use example::generated::game::*;
 use example::generated::improbable::*;
+use spatialos_sdk::worker::entity::Entity as WorkerEntity;
+use spatialos_sdk::worker::entity_builder::EntityBuilder;
+use spatialos_sdk::worker::snapshot::*;
+use spatialos_sdk::worker::*;
+use std::path::PathBuf;
+use structopt::StructOpt;
 
 fn main() {
     let opt = Opt::from_args();

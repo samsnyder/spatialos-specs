@@ -26,8 +26,13 @@ impl<'a> System<'a> for ClientBootstrap {
                         PlayerCreatorCommandRequest::CreatePlayer(CreatePlayerRequest {
                             name: "MyName".to_string(),
                         }),
-                        |_res, result| {
-                            println!("Created player! {:?}", result);
+                        |result| {
+                            result.get_system_data::<_, Self>(|(_, _entities, _)| {
+                                match &*result {
+                                    Ok(result) => println!("Created player: {:?}", result),
+                                    Err(status) => println!("Error creating player: {:?}", status),
+                                }
+                            })
                         },
                     )
                 }
@@ -50,10 +55,11 @@ impl<'a> System<'a> for PlayerCreatorSys {
                     let caller_worker_id = caller_worker_id.clone();
 
                     sys_command_sender.reserve_entity_ids(1, move |res, result| {
+                        let (_, mut sys_command_sender) = <Self as System>::SystemData::fetch(res);
+
                         let entity = Self::create_player_entity(player_name);
 
                         let reserved_id = result.unwrap().next().unwrap();
-                        let mut sys_command_sender = SystemCommandSender::fetch(res);
 
                         sys_command_sender.create_entity(
                             entity,

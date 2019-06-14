@@ -2,12 +2,15 @@ use crate::component_registry::WriteAndRegisterComponent;
 use spatialos_sdk::worker::commands::{IncomingCommandRequest, OutgoingCommandRequest};
 use spatialos_sdk::worker::component::Component as WorkerComponent;
 use spatialos_sdk::worker::connection::{Connection, WorkerConnection};
-use spatialos_sdk::worker::op::{CommandResponse, CommandResponseOp, StatusCode};
+use spatialos_sdk::worker::op::{
+    CommandResponse as WorkerCommandResponse, CommandResponseOp, StatusCode,
+};
 use spatialos_sdk::worker::{EntityId, RequestId};
 use specs::prelude::{
-    Component, Entities, Entity, HashMapStorage, Join, Resources, SystemData, WriteStorage,
+    Component, Entities, Entity, HashMapStorage, Join, Resources, SystemData, WriteStorage, System
 };
 use std::collections::HashMap;
+use std::ops::Deref;
 
 pub type CommandRequests<'a, T> = WriteStorage<'a, CommandRequestsComp<T>>;
 
@@ -95,6 +98,31 @@ impl<'a, T: 'static + WorkerComponent> CommandRequestsExt for CommandRequests<'a
     }
 }
 
+pub struct CommandResponse<'a, T: WorkerComponent> {
+    res: &'a Resources,
+    response: Result<&'a T::CommandResponse, StatusCode<WorkerCommandResponse<'a>>>,
+}
+
+impl<'a, T: WorkerComponent> CommandResponse<'a, T> {
+    pub fn get_system_data<F, S>(&self, cb: F)
+    where
+        S: System<'a>,
+        S::SystemData: SystemData<'a> + 'a,
+        F: 'a
+            + FnOnce(S::SystemData),
+    {
+        cb(S::SystemData::fetch(self.res));
+    }
+}
+
+impl<'a, T: WorkerComponent> Deref for CommandResponse<'a, T> {
+    type Target = Result<&'a T::CommandResponse, StatusCode<WorkerCommandResponse<'a>>>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.response
+    }
+}
+
 pub type CommandSender<'a, T> = WriteAndRegisterComponent<'a, CommandSenderRes<T>, T>;
 
 type CommandIntermediateCallback = Box<FnOnce(&Resources, CommandResponseOp) + Send + Sync>;
@@ -107,10 +135,7 @@ pub struct CommandSenderRes<T: WorkerComponent> {
 impl<T: 'static + WorkerComponent> CommandSenderRes<T> {
     pub fn send_command<F>(&mut self, entity_id: EntityId, request: T::CommandRequest, callback: F)
     where
-        F: 'static
-            + FnOnce(&Resources, Result<&T::CommandResponse, StatusCode<CommandResponse>>)
-            + Send
-            + Sync,
+        F: 'static + FnOnce(CommandResponse<T>) + Send + Sync,
     {
         self.buffered_requests.push((
             entity_id,
@@ -118,11 +143,15 @@ impl<T: 'static + WorkerComponent> CommandSenderRes<T> {
             Box::new(|res, response_op| match response_op.response {
                 StatusCode::Success(response) => {
                     let response = response.get::<T>().unwrap();
-                    callback(res, Ok(response));
+                    callback(CommandResponse {
+                        res,
+                        response: Ok(response),
+                    })
                 }
-                other => {
-                    callback(res, Err(other));
-                }
+                other => callback(CommandResponse {
+                    res,
+                    response: Err(other),
+                }),
             }),
         ));
     }
