@@ -22,6 +22,22 @@ use spatialos_sdk::worker::EntityId;
 use specs::prelude::{Component, Resources, System, SystemData, VecStorage};
 use std::fmt::Debug;
 
+/// A wrapper for a SpatialOS component data.
+///
+/// You can use `SpatialReadStorage` and `SpatialWriteStorage` in Systems to
+/// access this data.
+///
+/// There are two ways to update a SpatialOS component. **You must only use one of these ways**.
+///
+/// * You can mutably deference the `SpatialComponent` and modify the underlying 
+///   component data directly.
+///
+///   Please note that mutably dereferencing a component will send the entire component
+///   as an update at the end of the frame.
+///
+/// * You can use `send_update` to apply and send a partial update to SpatialOS.
+///   This is more efficient as you can control the exact properties you send.
+///
 #[derive(Debug)]
 pub struct SpatialComponent<T: WorkerComponent + Debug> {
     value: T,
@@ -103,6 +119,12 @@ impl<T: 'static + WorkerComponent> Component for SpatialComponent<T> {
     type Storage = VecStorage<Self>;
 }
 
+/// Represents a value along with the ability to get a system's `SystemData`.
+///
+/// This is used as responses to commands, where the user needs access to
+/// `SystemData` in order to perform actions based on a response.
+///
+#[doc(hidden)]
 pub struct ValueWithSystemData<'a, T> {
     res: &'a Resources,
     value: T,
