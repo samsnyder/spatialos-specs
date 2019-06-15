@@ -4,27 +4,6 @@ use spatialos_sdk::worker::entity_builder::EntityBuilder;
 use spatialos_specs::*;
 use specs::prelude::*;
 
-pub struct OtherSys {
-    pub has_requested_player: bool,
-}
-
-impl<'a> System<'a> for OtherSys {
-    type SystemData = (
-        SpatialWriteStorage2<'a, PlayerCreator>
-    );
-
-    fn run(&mut self, (mut creator): Self::SystemData) {
-        if !self.has_requested_player {
-            match (&mut creator).join().next() {
-                Some((player_creator_entity)) => {
-                    println!("Got creator!!!");
-                }
-                None => {}
-            }
-        }
-    }
-}
-
 pub struct ClientBootstrap {
     pub has_requested_player: bool,
 }

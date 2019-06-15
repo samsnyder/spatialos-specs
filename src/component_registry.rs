@@ -2,7 +2,7 @@ use crate::commands::{
     CommandRequests, CommandRequestsComp, CommandRequestsExt, CommandSender, CommandSenderRes,
 };
 use crate::entities::SpatialEntity;
-use crate::storage::{AuthorityBitSet, SpatialStorage, SpatialWriteStorage};
+use crate::storage::{AuthorityBitSet, SpatialWriteStorage};
 use crate::SpatialComponent;
 use spatialos_sdk::worker::component::Component as WorkerComponent;
 use spatialos_sdk::worker::component::ComponentId;
@@ -11,11 +11,9 @@ use spatialos_sdk::worker::op::{
     AddComponentOp, AuthorityChangeOp, CommandRequestOp, CommandResponseOp, ComponentUpdateOp,
 };
 use specs::prelude::{Join, ReadStorage, Resources, Storage, SystemData, Write, WriteStorage};
-use specs::shred::{Resource, ResourceId};
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::marker::PhantomData;
-use std::ops::{Deref, DerefMut};
 
 static mut COMPONENT_REGISTRY: Option<ComponentRegistry> = None;
 
@@ -41,7 +39,6 @@ impl ComponentRegistry {
     }
 
     pub(crate) fn register_component<T: 'static + WorkerComponent>() {
-        println!("REGISTER: {:?}", T::ID);
         unsafe {
             let interface = ComponentDispatcher::<T> {
                 _phantom: PhantomData,
@@ -130,15 +127,17 @@ impl<T: 'static + WorkerComponent + Sync + Send + Clone + Debug> ComponentDispat
         entity: SpatialEntity,
         add_component: AddComponentOp,
     ) {
-        let mut storage: SpatialWriteStorage<T> = SpatialStorage::fetch(res);
+        let mut storage: SpatialWriteStorage<T> = SpatialWriteStorage::fetch(res);
         let data = add_component.get::<T>().unwrap().clone();
 
-        storage.insert(entity, SpatialComponent::new(data)).unwrap();
+        storage
+            .insert(entity.specs_entity(), SpatialComponent::new(data))
+            .unwrap();
     }
 
     fn remove_component<'b>(&self, res: &Resources, entity: SpatialEntity) {
-        let mut storage: SpatialWriteStorage<T> = SpatialStorage::fetch(res);
-        storage.remove(entity);
+        let mut storage: SpatialWriteStorage<T> = SpatialWriteStorage::fetch(res);
+        storage.remove(entity.specs_entity());
     }
 
     fn apply_component_update<'b>(
@@ -147,11 +146,11 @@ impl<T: 'static + WorkerComponent + Sync + Send + Clone + Debug> ComponentDispat
         entity: SpatialEntity,
         component_update: ComponentUpdateOp,
     ) {
-        let mut storage: SpatialWriteStorage<T> = SpatialStorage::fetch(res);
+        let mut storage: SpatialWriteStorage<T> = SpatialWriteStorage::fetch(res);
         let update = component_update.get::<T>().unwrap().clone();
 
         storage
-            .get_mut(entity)
+            .get_mut(entity.specs_entity())
             .unwrap()
             .apply_update_to_value(update);
     }
@@ -205,7 +204,7 @@ impl<T: 'static + WorkerComponent + Sync + Send + Clone + Debug> ComponentDispat
 
     fn replicate(&self, res: &Resources, connection: &mut WorkerConnection) {
         let entities: ReadStorage<SpatialEntity> = Storage::fetch(res);
-        let mut storage: SpatialWriteStorage<T> = SpatialStorage::fetch(res);
+        let mut storage: SpatialWriteStorage<T> = SpatialWriteStorage::fetch(res);
 
         for (entity, component) in (&entities, &mut storage).join() {
             component.replicate(connection, entity.entity_id());

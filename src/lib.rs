@@ -11,9 +11,10 @@ pub use entities::{SpatialEntities, SpatialEntity};
 pub use spatial_reader::SpatialReaderSystem;
 pub use spatial_writer::SpatialWriterSystem;
 pub use std::ops::{Deref, DerefMut};
-pub use storage::{SpatialReadStorage, SpatialWriteStorage, SpatialWriteStorage2};
+pub use storage::{SpatialReadStorage, SpatialWriteStorage};
 pub use system_commands::SystemCommandSender;
 
+use crate::storage::SpatialUnprotectedStorage;
 use spatialos_sdk::worker::component::Component as WorkerComponent;
 use spatialos_sdk::worker::component::{ComponentUpdate, TypeConversion, UpdateParameters};
 use spatialos_sdk::worker::connection::{Connection, WorkerConnection};
@@ -21,7 +22,6 @@ use spatialos_sdk::worker::internal::schema::SchemaComponentUpdate;
 use spatialos_sdk::worker::EntityId;
 use specs::prelude::{Component, Resources, System, SystemData, VecStorage};
 use std::fmt::Debug;
-use crate::storage::SpatialUnprotectedStorage;
 
 /// A wrapper for a SpatialOS component data.
 ///
@@ -30,7 +30,7 @@ use crate::storage::SpatialUnprotectedStorage;
 ///
 /// There are two ways to update a SpatialOS component. **You must only use one of these ways**.
 ///
-/// * You can mutably deference the `SpatialComponent` and modify the underlying 
+/// * You can mutably deference the `SpatialComponent` and modify the underlying
 ///   component data directly.
 ///
 ///   Please note that mutably dereferencing a component will send the entire component
