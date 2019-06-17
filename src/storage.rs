@@ -49,7 +49,7 @@ where
 unsafe impl<T, U> DistinctStorage for SpatialUnprotectedStorage<T, U>
 where
     T: 'static + WorkerComponent,
-    U: UnprotectedStorage<SpatialComponent<T>> + Default,
+    U: UnprotectedStorage<SpatialComponent<T>> + Default + DistinctStorage,
 {
 }
 
@@ -128,6 +128,16 @@ where
     unsafe fn get(v: &mut Self::Value, i: Index) -> &'a mut SpatialComponent<T> {
         <&'a mut WriteStorage<'a, SpatialComponent<T>> as Join>::get(v, i)
     }
+}
+
+// SAFETY: This is safe because of the `DistinctStorage` guarantees.
+#[cfg(feature = "parallel")]
+unsafe impl<'a, 'e, T> ParJoin for &'a mut SpatialWriteStorage<'e, T>
+where
+    T: 'static + WorkerComponent,
+    D: DerefMut<Target = MaskedStorage<T>>,
+    <SpatialComponent<T> as Component>::Storage: Sync + DistinctStorage,
+{
 }
 
 pub struct AuthorityBitSet<T: WorkerComponent> {
