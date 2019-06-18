@@ -1,4 +1,5 @@
 use crate::component_registry::ComponentRegistry;
+use crate::entities::EntityId;
 use crate::ValueWithSystemData;
 use spatialos_sdk::worker::commands::{IncomingCommandRequest, OutgoingCommandRequest};
 use spatialos_sdk::worker::component::Component as WorkerComponent;
@@ -6,7 +7,7 @@ use spatialos_sdk::worker::connection::{Connection, WorkerConnection};
 use spatialos_sdk::worker::op::{
     CommandResponse as WorkerCommandResponse, CommandResponseOp, StatusCode,
 };
-use spatialos_sdk::worker::{EntityId, RequestId};
+use spatialos_sdk::worker::RequestId;
 use specs::prelude::{
     Component, Entities, Entity, HashMapStorage, Join, Resources, SystemData, Write, WriteStorage,
 };
@@ -152,8 +153,12 @@ impl<T: 'static + WorkerComponent> CommandSenderRes<T> {
     pub(crate) fn flush_requests(&mut self, connection: &mut WorkerConnection) {
         for (entity_id, request, callback) in self.buffered_requests.drain(..) {
             // TODO: Default command params like timeout
-            let request_id =
-                connection.send_command_request::<T>(entity_id, request, None, Default::default());
+            let request_id = connection.send_command_request::<T>(
+                entity_id.id(),
+                request,
+                None,
+                Default::default(),
+            );
             self.callbacks.insert(request_id, callback);
         }
     }

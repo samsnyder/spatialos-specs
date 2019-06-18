@@ -11,18 +11,18 @@ pub struct ClientBootstrap {
 impl<'a> System<'a> for ClientBootstrap {
     type SystemData = (
         SpatialReadStorage<'a, PlayerCreator>,
-        SpatialEntities<'a>,
+        EntityIds<'a>,
         CommandSender<'a, PlayerCreator>,
     );
 
-    fn run(&mut self, (creator, entities, mut player_command_sender): Self::SystemData) {
+    fn run(&mut self, (creator, entity_ids, mut player_command_sender): Self::SystemData) {
         if !self.has_requested_player {
-            match (&creator, &entities).join().next() {
-                Some((_, player_creator_entity)) => {
+            match (&creator, &entity_ids).join().next() {
+                Some((_, player_creator_entity_id)) => {
                     self.has_requested_player = true;
 
                     player_command_sender.send_command(
-                        player_creator_entity.entity_id(),
+                        *player_creator_entity_id,
                         PlayerCreatorCommandRequest::CreatePlayer(CreatePlayerRequest {
                             name: "MyName".to_string(),
                         }),

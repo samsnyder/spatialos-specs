@@ -7,7 +7,7 @@ mod storage;
 pub mod system_commands;
 
 pub use commands::{CommandRequests, CommandSender};
-pub use entities::{SpatialEntities, SpatialEntity};
+pub use entities::{EntityId, EntityIds};
 pub use spatial_reader::SpatialReaderSystem;
 pub use spatial_writer::SpatialWriterSystem;
 pub use std::ops::{Deref, DerefMut};
@@ -19,7 +19,6 @@ use spatialos_sdk::worker::component::Component as WorkerComponent;
 use spatialos_sdk::worker::component::{ComponentUpdate, TypeConversion, UpdateParameters};
 use spatialos_sdk::worker::connection::{Connection, WorkerConnection};
 use spatialos_sdk::worker::internal::schema::SchemaComponentUpdate;
-use spatialos_sdk::worker::EntityId;
 use specs::prelude::{Component, Resources, System, SystemData, VecStorage};
 use std::fmt::Debug;
 
@@ -66,7 +65,11 @@ impl<T: WorkerComponent + TypeConversion + Debug> SpatialComponent<T> {
         };
 
         if let Some(update) = update {
-            connection.send_component_update::<T>(entity_id, update, UpdateParameters::default());
+            connection.send_component_update::<T>(
+                entity_id.id(),
+                update,
+                UpdateParameters::default(),
+            );
         }
     }
 

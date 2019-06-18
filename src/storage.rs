@@ -1,11 +1,10 @@
 use crate::component_registry::ComponentRegistry;
-use crate::entities::SpatialEntity;
 use crate::SpatialComponent;
 use hibitset::{BitSet, BitSetAnd, BitSetLike};
 use spatialos_sdk::worker::component::Component as WorkerComponent;
 use spatialos_sdk::worker::Authority;
 use specs::join::BitAnd;
-use specs::prelude::{Component, Join, ReadStorage, Resources, SystemData, WriteStorage};
+use specs::prelude::{Component, Entity, Join, ReadStorage, Resources, SystemData, WriteStorage};
 use specs::shred::{Fetch, ResourceId};
 use specs::storage::{DistinctStorage, UnprotectedStorage};
 use specs::world::Index;
@@ -153,11 +152,11 @@ impl<T: WorkerComponent> AuthorityBitSet<T> {
         }
     }
 
-    pub(crate) fn set_authority(&mut self, e: SpatialEntity, authority: Authority) {
+    pub(crate) fn set_authority(&mut self, e: Entity, authority: Authority) {
         if authority == Authority::NotAuthoritative {
-            self.mask.remove(e.specs_entity().id());
+            self.mask.remove(e.id());
         } else {
-            self.mask.add(e.specs_entity().id());
+            self.mask.add(e.id());
         }
     }
 }

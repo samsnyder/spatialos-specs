@@ -1,5 +1,5 @@
 use crate::component_registry::ComponentRegistry;
-use crate::entities::{SpatialEntities, SpatialEntitiesRes};
+use crate::entities::{EntityId, EntityIds, SpatialEntitiesRes};
 use crate::system_commands::{SystemCommandSender, SystemCommandSenderRes};
 use spatialos_sdk::worker::connection::{Connection, WorkerConnection};
 use spatialos_sdk::worker::op::WorkerOp;
@@ -41,7 +41,7 @@ impl<'a> System<'a> for SpatialReaderSystem {
         Self::SystemData::setup(res);
 
         SystemCommandSender::setup(res);
-        SpatialEntities::setup(res);
+        EntityIds::setup(res);
     }
 
     fn run(&mut self, res: Self::SystemData) {
@@ -56,18 +56,18 @@ impl<'a> System<'a> for SpatialReaderSystem {
             match op {
                 WorkerOp::AddEntity(add_entity_op) => {
                     res.fetch_mut::<SpatialEntitiesRes>()
-                        .got_new_entity(res, add_entity_op.entity_id);
+                        .got_new_entity(res, EntityId(add_entity_op.entity_id));
                 }
                 WorkerOp::RemoveEntity(remove_entity_op) => {
                     res.fetch_mut::<SpatialEntitiesRes>()
-                        .remove_entity(res, remove_entity_op.entity_id);
+                        .remove_entity(res, EntityId(remove_entity_op.entity_id));
                 }
                 WorkerOp::AddComponent(add_component) => {
                     match ComponentRegistry::get_interface(add_component.component_id) {
                         None => {}
                         Some(interface) => {
-                            let entity = SpatialEntities::fetch(res)
-                                .get_entity(add_component.entity_id)
+                            let entity = EntityIds::fetch(res)
+                                .get_entity(EntityId(add_component.entity_id))
                                 .unwrap();
                             interface.add_component(res, entity, add_component);
                         }
@@ -77,8 +77,8 @@ impl<'a> System<'a> for SpatialReaderSystem {
                     match ComponentRegistry::get_interface(remove_component.component_id) {
                         None => {}
                         Some(interface) => {
-                            let entity = SpatialEntities::fetch(res)
-                                .get_entity(remove_component.entity_id)
+                            let entity = EntityIds::fetch(res)
+                                .get_entity(EntityId(remove_component.entity_id))
                                 .unwrap();
                             interface.remove_component(res, entity);
                         }
@@ -88,8 +88,8 @@ impl<'a> System<'a> for SpatialReaderSystem {
                     match ComponentRegistry::get_interface(update.component_id) {
                         None => {}
                         Some(interface) => {
-                            let entity = SpatialEntities::fetch(res)
-                                .get_entity(update.entity_id)
+                            let entity = EntityIds::fetch(res)
+                                .get_entity(EntityId(update.entity_id))
                                 .unwrap();
                             interface.apply_component_update(res, entity, update);
                         }
@@ -99,8 +99,8 @@ impl<'a> System<'a> for SpatialReaderSystem {
                     match ComponentRegistry::get_interface(authority_change.component_id) {
                         None => {}
                         Some(interface) => {
-                            let entity = SpatialEntities::fetch(res)
-                                .get_entity(authority_change.entity_id)
+                            let entity = EntityIds::fetch(res)
+                                .get_entity(EntityId(authority_change.entity_id))
                                 .unwrap();
                             interface.apply_authority_change(res, entity, authority_change);
                         }
@@ -110,8 +110,8 @@ impl<'a> System<'a> for SpatialReaderSystem {
                     match ComponentRegistry::get_interface(command_request.component_id) {
                         None => {}
                         Some(interface) => {
-                            let entity = SpatialEntities::fetch(res)
-                                .get_entity(command_request.entity_id)
+                            let entity = EntityIds::fetch(res)
+                                .get_entity(EntityId(command_request.entity_id))
                                 .unwrap();
                             interface.on_command_request(res, entity, command_request);
                         }
