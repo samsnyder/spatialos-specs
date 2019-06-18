@@ -11,15 +11,15 @@ use specs::world::Index;
 use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
 
-pub struct SpatialUnprotectedStorage<T, U>(U, PhantomData<T>)
+pub struct SpatialUnprotectedStorage<T, C, U>(U, PhantomData<T>, PhantomData<C>)
 where
     T: 'static + WorkerComponent,
-    U: UnprotectedStorage<SpatialComponent<T>> + Default;
+    U: UnprotectedStorage<C> + Default;
 
-impl<T, U> UnprotectedStorage<SpatialComponent<T>> for SpatialUnprotectedStorage<T, U>
+impl<T, C, U> UnprotectedStorage<C> for SpatialUnprotectedStorage<T, C, U>
 where
     T: 'static + WorkerComponent,
-    U: UnprotectedStorage<SpatialComponent<T>> + Default,
+    U: UnprotectedStorage<C> + Default,
 {
     unsafe fn clean<B>(&mut self, has: B)
     where
@@ -28,38 +28,38 @@ where
         self.0.clean(has);
     }
 
-    unsafe fn get(&self, id: Index) -> &SpatialComponent<T> {
+    unsafe fn get(&self, id: Index) -> &C {
         self.0.get(id)
     }
 
-    unsafe fn get_mut(&mut self, id: Index) -> &mut SpatialComponent<T> {
+    unsafe fn get_mut(&mut self, id: Index) -> &mut C {
         self.0.get_mut(id)
     }
 
-    unsafe fn insert(&mut self, id: Index, v: SpatialComponent<T>) {
+    unsafe fn insert(&mut self, id: Index, v: C) {
         self.0.insert(id, v);
     }
 
-    unsafe fn remove(&mut self, id: Index) -> SpatialComponent<T> {
+    unsafe fn remove(&mut self, id: Index) -> C {
         self.0.remove(id)
     }
 }
 
-unsafe impl<T, U> DistinctStorage for SpatialUnprotectedStorage<T, U>
+unsafe impl<T, C, U> DistinctStorage for SpatialUnprotectedStorage<T, C, U>
 where
     T: 'static + WorkerComponent,
-    U: UnprotectedStorage<SpatialComponent<T>> + Default + DistinctStorage,
+    U: UnprotectedStorage<C> + Default + DistinctStorage,
 {
 }
 
-impl<T, U> Default for SpatialUnprotectedStorage<T, U>
+impl<T, C, U> Default for SpatialUnprotectedStorage<T, C, U>
 where
     T: 'static + WorkerComponent,
-    U: UnprotectedStorage<SpatialComponent<T>> + Default,
+    U: UnprotectedStorage<C> + Default,
 {
     fn default() -> Self {
         ComponentRegistry::register_component::<T>();
-        SpatialUnprotectedStorage(Default::default(), PhantomData)
+        SpatialUnprotectedStorage(Default::default(), PhantomData, PhantomData)
     }
 }
 

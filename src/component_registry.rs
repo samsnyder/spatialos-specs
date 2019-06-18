@@ -11,6 +11,7 @@ use spatialos_sdk::worker::op::{
     AddComponentOp, AuthorityChangeOp, CommandRequestOp, CommandResponseOp, ComponentUpdateOp,
 };
 use specs::prelude::{Entity, Join, Resources, SystemData, Write, WriteStorage};
+use specs::storage::MaskedStorage;
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::marker::PhantomData;
@@ -110,9 +111,6 @@ impl<T: 'static + WorkerComponent + Sync + Send + Clone + Debug> ComponentDispat
         // Create command sender resource.
         Write::<CommandSenderRes<T>>::setup(res);
 
-        // Create command receiver storage.
-        CommandRequests::<T>::setup(res);
-
         res.insert(AuthorityBitSet::<T>::new());
     }
 
@@ -201,11 +199,13 @@ impl<T: 'static + WorkerComponent + Sync + Send + Clone + Debug> ComponentDispat
         // Send queued command requests and responses
         CommandSender::<T>::fetch(res).flush_requests(connection);
 
-        let mut responses = CommandRequests::<T>::fetch(res);
-        for entity in (&mut responses).join() {
-            entity.flush_responses(connection);
-        }
+        if res.has_value::<MaskedStorage<CommandRequestsComp<T>>>() {
+            let mut responses = CommandRequests::<T>::fetch(res);
+            for entity in (&mut responses).join() {
+                entity.flush_responses(connection);
+            }
 
-        responses.clear_empty_request_objects(res);
+            responses.clear_empty_request_objects(res);
+        }
     }
 }

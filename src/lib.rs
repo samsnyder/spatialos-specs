@@ -28,6 +28,7 @@ use std::fmt::Debug;
 /// access this data.
 ///
 /// There are two ways to update a SpatialOS component. **You must only use one of these ways**.
+/// If you mix these methods, there will be a runtime panic.
 ///
 /// * You can mutably deference the `SpatialComponent` and modify the underlying
 ///   component data directly.
@@ -120,7 +121,7 @@ impl<T: WorkerComponent + Debug> DerefMut for SpatialComponent<T> {
 }
 
 impl<T: 'static + WorkerComponent> Component for SpatialComponent<T> {
-    type Storage = SpatialUnprotectedStorage<T, VecStorage<Self>>;
+    type Storage = SpatialUnprotectedStorage<T, Self, VecStorage<Self>>;
 }
 
 /// Represents a value along with the ability to get a system's `SystemData`.

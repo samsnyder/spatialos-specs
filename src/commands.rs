@@ -1,5 +1,6 @@
 use crate::component_registry::ComponentRegistry;
 use crate::entities::EntityId;
+use crate::storage::SpatialUnprotectedStorage;
 use crate::ValueWithSystemData;
 use spatialos_sdk::worker::commands::{IncomingCommandRequest, OutgoingCommandRequest};
 use spatialos_sdk::worker::component::Component as WorkerComponent;
@@ -13,6 +14,42 @@ use specs::prelude::{
 };
 use std::collections::HashMap;
 
+/// A storage which contains command requests for a given component
+/// that have not been responded to yet.
+///
+/// You can respond to the requests via the `respond` method, for example:
+///
+/// ```
+/// impl<'a> System<'a> for PlayerCreatorSys {
+///     type SystemData = (CommandRequests<'a, Player>, SpatialWriteStorage<'a, Player>);
+///
+///     fn run(&mut self, (mut requests, mut player): Self::SystemData) {
+///         for (request, player) in (&mut requests, &mut player).join() {
+///             request.respond(|request, caller_worker_id, _| match request {
+///                 PlayerCommandRequest::UpdateHealth(request) => {
+///                     player.health -= request.damage;
+///
+///                     Some(PlayerCommandResponse::UpdateHealth(
+///                         UpdateHealthResponse {
+///                             new_health: player.health
+///                         },
+///                     ))
+///                 }
+///             });
+///         }
+///     }
+/// }
+/// ```
+///
+/// If the closure given to `respond` returns `None`, the command request will
+/// not be responded to. Please note that a command request will stay in this
+/// component until it has been responded too.
+///
+/// A command will only be responded to in a single system. If `SysA` runs before
+/// `SysB` and `SysB` responds to a request, `SysB` cannot see that request.
+///
+/// Asynchronous command responses are not yet supported.
+///
 pub type CommandRequests<'a, T> = WriteStorage<'a, CommandRequestsComp<T>>;
 
 pub struct CommandRequestsComp<T: WorkerComponent> {
@@ -35,7 +72,7 @@ impl<T: WorkerComponent> Default for CommandRequestsComp<T> {
 }
 
 impl<T: 'static + WorkerComponent> Component for CommandRequestsComp<T> {
-    type Storage = HashMapStorage<Self>;
+    type Storage = SpatialUnprotectedStorage<T, Self, HashMapStorage<Self>>;
 }
 
 impl<T: 'static + WorkerComponent> CommandRequestsComp<T> {
@@ -50,6 +87,13 @@ impl<T: 'static + WorkerComponent> CommandRequestsComp<T> {
             .push((request_id, request, caller_worker_id, caller_attribute_set));
     }
 
+    /// Respond to the pending command requests.
+    /// 
+    /// The given closure accepts a command request object and returns:
+    ///
+    /// * `Some(response)` to respond to the command.
+    /// * `None` to not respond to the command, leaving the request for other systems or
+    ///   the next frame.
     pub fn respond<F>(&mut self, mut responder: F)
     where
         F: FnMut(&T::CommandRequest, &String, &Vec<String>) -> Option<T::CommandResponse>,
