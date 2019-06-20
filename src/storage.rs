@@ -11,60 +11,15 @@ use specs::world::Index;
 use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
 
-pub struct SpatialUnprotectedStorage<T, C, U>(U, PhantomData<T>, PhantomData<C>)
-where
-    T: 'static + WorkerComponent,
-    U: UnprotectedStorage<C> + Default;
-
-impl<T, C, U> UnprotectedStorage<C> for SpatialUnprotectedStorage<T, C, U>
-where
-    T: 'static + WorkerComponent,
-    U: UnprotectedStorage<C> + Default,
-{
-    unsafe fn clean<B>(&mut self, has: B)
-    where
-        B: BitSetLike,
-    {
-        self.0.clean(has);
-    }
-
-    unsafe fn get(&self, id: Index) -> &C {
-        self.0.get(id)
-    }
-
-    unsafe fn get_mut(&mut self, id: Index) -> &mut C {
-        self.0.get_mut(id)
-    }
-
-    unsafe fn insert(&mut self, id: Index, v: C) {
-        self.0.insert(id, v);
-    }
-
-    unsafe fn remove(&mut self, id: Index) -> C {
-        self.0.remove(id)
-    }
-}
-
-unsafe impl<T, C, U> DistinctStorage for SpatialUnprotectedStorage<T, C, U>
-where
-    T: 'static + WorkerComponent,
-    U: UnprotectedStorage<C> + Default + DistinctStorage,
-{
-}
-
-impl<T, C, U> Default for SpatialUnprotectedStorage<T, C, U>
-where
-    T: 'static + WorkerComponent,
-    U: UnprotectedStorage<C> + Default,
-{
-    fn default() -> Self {
-        ComponentRegistry::register_component::<T>();
-        SpatialUnprotectedStorage(Default::default(), PhantomData, PhantomData)
-    }
-}
-
+/// A wrapper around the read storage of a SpatialOS component.
+///
+/// Analagous to `ReadStorage`.
 pub type SpatialReadStorage<'a, T> = ReadStorage<'a, SpatialComponent<T>>;
 
+/// Retrieves write access to any component of this type which this worker has
+/// authority over.
+///
+/// Analagous to `WriteStorage`.
 pub struct SpatialWriteStorage<'a, T: 'static + WorkerComponent> {
     data: WriteStorage<'a, SpatialComponent<T>>,
     authority: Fetch<'a, AuthorityBitSet<T>>,
@@ -129,17 +84,72 @@ where
     }
 }
 
-// SAFETY: This is safe because of the `DistinctStorage` guarantees.
 #[cfg(feature = "parallel")]
 unsafe impl<'a, 'e, T> ParJoin for &'a mut SpatialWriteStorage<'e, T>
 where
     T: 'static + WorkerComponent,
     D: DerefMut<Target = MaskedStorage<T>>,
+    WriteStorage<'a, SpatialComponent<T>>: ParJoin,
     <SpatialComponent<T> as Component>::Storage: Sync + DistinctStorage,
 {
 }
 
-pub struct AuthorityBitSet<T: WorkerComponent> {
+/// A wrapper around an arbitrary `UnprotectedStorage` which registers
+/// the SpatialOS component in the `ComponentRegistry`.
+#[doc(hidden)]
+pub struct SpatialUnprotectedStorage<T, C, U>(U, PhantomData<T>, PhantomData<C>)
+where
+    T: 'static + WorkerComponent,
+    U: UnprotectedStorage<C> + Default;
+
+impl<T, C, U> UnprotectedStorage<C> for SpatialUnprotectedStorage<T, C, U>
+where
+    T: 'static + WorkerComponent,
+    U: UnprotectedStorage<C> + Default,
+{
+    unsafe fn clean<B>(&mut self, has: B)
+    where
+        B: BitSetLike,
+    {
+        self.0.clean(has);
+    }
+
+    unsafe fn get(&self, id: Index) -> &C {
+        self.0.get(id)
+    }
+
+    unsafe fn get_mut(&mut self, id: Index) -> &mut C {
+        self.0.get_mut(id)
+    }
+
+    unsafe fn insert(&mut self, id: Index, v: C) {
+        self.0.insert(id, v);
+    }
+
+    unsafe fn remove(&mut self, id: Index) -> C {
+        self.0.remove(id)
+    }
+}
+
+unsafe impl<T, C, U> DistinctStorage for SpatialUnprotectedStorage<T, C, U>
+where
+    T: 'static + WorkerComponent,
+    U: UnprotectedStorage<C> + Default + DistinctStorage,
+{
+}
+
+impl<T, C, U> Default for SpatialUnprotectedStorage<T, C, U>
+where
+    T: 'static + WorkerComponent,
+    U: UnprotectedStorage<C> + Default,
+{
+    fn default() -> Self {
+        ComponentRegistry::register_component::<T>();
+        SpatialUnprotectedStorage(Default::default(), PhantomData, PhantomData)
+    }
+}
+
+pub(crate) struct AuthorityBitSet<T: WorkerComponent> {
     mask: BitSet,
     _phantom: PhantomData<T>,
 }

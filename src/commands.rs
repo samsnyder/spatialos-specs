@@ -88,7 +88,7 @@ impl<T: 'static + WorkerComponent> CommandRequestsComp<T> {
     }
 
     /// Respond to the pending command requests.
-    /// 
+    ///
     /// The given closure accepts a command request object and returns:
     ///
     /// * `Some(response)` to respond to the command.
@@ -143,7 +143,7 @@ impl<'a, T: 'static + WorkerComponent> CommandRequestsExt for CommandRequests<'a
     }
 }
 
-pub type CommandResponse<'a, T> = ValueWithSystemData<
+type CommandResponse<'a, T> = ValueWithSystemData<
     'a,
     Result<&'a <T as WorkerComponent>::CommandResponse, StatusCode<WorkerCommandResponse<'a>>>,
 >;

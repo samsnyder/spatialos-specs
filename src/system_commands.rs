@@ -15,7 +15,7 @@ use std::collections::HashMap;
 
 pub type SystemCommandSender<'a> = Write<'a, SystemCommandSenderRes>;
 
-pub type SystemCommandResponse<'a, T> = ValueWithSystemData<'a, Result<T, StatusCode<T>>>;
+type SystemCommandResponse<'a, T> = ValueWithSystemData<'a, Result<T, StatusCode<T>>>;
 
 type IntermediateCallback<O> = Box<FnOnce(&Resources, O) + Send + Sync>;
 
