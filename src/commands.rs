@@ -19,7 +19,7 @@ use std::collections::HashMap;
 ///
 /// You can respond to the requests via the `respond` method, for example:
 ///
-/// ```
+/// ```ignore
 /// impl<'a> System<'a> for PlayerCreatorSys {
 ///     type SystemData = (CommandRequests<'a, Player>, SpatialWriteStorage<'a, Player>);
 ///

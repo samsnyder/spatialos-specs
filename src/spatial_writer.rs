@@ -14,6 +14,16 @@ use specs::prelude::{Resources, System, SystemData, WriteExpect};
 /// ## Example
 ///
 /// ```
+/// # use specs::prelude::*;
+/// # use spatialos_specs::*;
+/// #
+/// # struct MovePlayerSys;
+/// # impl<'a> System<'a> for MovePlayerSys{
+/// #     type SystemData = ();
+/// #
+/// #     fn run(&mut self, _sys: ()) {}
+/// # }
+/// #
 /// let mut world = World::new();
 ///
 /// let mut dispatcher = DispatcherBuilder::new()
