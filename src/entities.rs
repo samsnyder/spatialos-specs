@@ -118,3 +118,48 @@ impl<'a> Join for &'a EntityIdsSystemData<'a> {
 
 #[cfg(feature = "parallel")]
 unsafe impl<'a> ParJoin for EntityIdsSystemData<'a> {}
+
+#[test]
+fn entities_should_be_added_and_removed_successfully() {
+    use specs::prelude::World;
+
+    let mut world = World::new();
+
+    type SystemData<'a> = (Entities<'a>, EntityIds<'a>);
+
+    SystemData::setup(&mut world.res);
+
+    {
+        let (entities, entity_ids) = SystemData::fetch(&world.res);
+        assert!((&entities, &entity_ids).join().next().is_none());
+    }
+
+    world
+        .res
+        .fetch_mut::<SpatialEntitiesRes>()
+        .got_new_entity(&world.res, EntityId(WorkerEntityId::new(5)));
+
+    {
+        let (entities, entity_ids) = SystemData::fetch(&world.res);
+        let (entity, entity_id) = (&entities, &entity_ids).join().next().unwrap();
+        assert_eq!(5, entity_id.id().id);
+
+        let fetched_entity = entity_ids
+            .get_entity(EntityId(WorkerEntityId::new(5)))
+            .unwrap();
+        assert_eq!(entity, fetched_entity);
+    }
+
+    world
+        .res
+        .fetch_mut::<SpatialEntitiesRes>()
+        .remove_entity(&world.res, EntityId(WorkerEntityId::new(5)));
+
+    {
+        let (entities, entity_ids) = SystemData::fetch(&world.res);
+        assert!((&entities, &entity_ids).join().next().is_none());
+        assert!(entity_ids
+            .get_entity(EntityId(WorkerEntityId::new(5)))
+            .is_none());
+    }
+}

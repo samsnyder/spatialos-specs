@@ -1,6 +1,11 @@
+#[macro_use]
+extern crate lazy_static;
+
 pub mod commands;
 mod component_registry;
 pub mod entities;
+#[cfg(test)]
+mod generated_test;
 mod spatial_reader;
 mod spatial_writer;
 mod storage;

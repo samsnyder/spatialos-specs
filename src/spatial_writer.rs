@@ -49,8 +49,6 @@ impl<'a> System<'a> for SpatialWriterSystem {
 
     fn setup(&mut self, res: &mut Resources) {
         Self::SystemData::setup(res);
-
-        ComponentRegistry::setup_components(res);
     }
 
     fn run(&mut self, (mut connection, mut system_command_sender, res): Self::SystemData) {

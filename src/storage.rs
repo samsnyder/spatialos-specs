@@ -4,9 +4,11 @@ use hibitset::{BitSet, BitSetAnd, BitSetLike};
 use spatialos_sdk::worker::component::Component as WorkerComponent;
 use spatialos_sdk::worker::Authority;
 use specs::join::BitAnd;
-use specs::prelude::{Component, Entity, Join, ReadStorage, Resources, SystemData, WriteStorage};
+use specs::prelude::{
+    Component, Entity, Join, Read, ReadStorage, Resources, SystemData, WriteStorage,
+};
 use specs::shred::{Fetch, ResourceId};
-use specs::storage::{DistinctStorage, UnprotectedStorage};
+use specs::storage::{DistinctStorage, MaskedStorage, UnprotectedStorage};
 use specs::world::Index;
 use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
@@ -23,6 +25,18 @@ pub type SpatialReadStorage<'a, T> = ReadStorage<'a, SpatialComponent<T>>;
 pub struct SpatialWriteStorage<'a, T: 'static + WorkerComponent> {
     data: WriteStorage<'a, SpatialComponent<T>>,
     authority: Fetch<'a, AuthorityBitSet<T>>,
+}
+
+impl<'a, T: 'static + WorkerComponent> SpatialWriteStorage<'a, T> {
+    pub(crate) fn try_fetch_component_storage(
+        res: &'a Resources,
+    ) -> Option<WriteStorage<'a, SpatialComponent<T>>> {
+        if res.has_value::<MaskedStorage<SpatialComponent<T>>>() {
+            Some(WriteStorage::<SpatialComponent<T>>::fetch(res))
+        } else {
+            None
+        }
+    }
 }
 
 impl<'a, T: 'static + WorkerComponent> Deref for SpatialWriteStorage<'a, T> {
@@ -44,6 +58,7 @@ where
     T: 'static + WorkerComponent,
 {
     fn setup(res: &mut Resources) {
+        Read::<AuthorityBitSet<T>>::setup(res);
         WriteStorage::<SpatialComponent<T>>::setup(res);
     }
 
@@ -155,18 +170,130 @@ pub(crate) struct AuthorityBitSet<T: WorkerComponent> {
 }
 
 impl<T: WorkerComponent> AuthorityBitSet<T> {
-    pub(crate) fn new() -> Self {
-        AuthorityBitSet {
-            mask: BitSet::new(),
-            _phantom: PhantomData,
-        }
-    }
-
     pub(crate) fn set_authority(&mut self, e: Entity, authority: Authority) {
         if authority == Authority::NotAuthoritative {
             self.mask.remove(e.id());
         } else {
             self.mask.add(e.id());
         }
+    }
+}
+
+impl<T: WorkerComponent> Default for AuthorityBitSet<T> {
+    fn default() -> Self {
+        AuthorityBitSet {
+            mask: BitSet::new(),
+            _phantom: PhantomData,
+        }
+    }
+}
+
+#[test]
+fn component_registers_successfully_on_read() {
+    use crate::generated_test::*;
+    use specs::prelude::World;
+
+    let mut world = World::new();
+
+    SpatialReadStorage::<Position>::setup(&mut world.res);
+
+    assert!(ComponentRegistry::get_interface(Position::ID).is_some());
+}
+
+#[test]
+fn component_registers_successfully_on_write() {
+    use crate::generated_test::*;
+    use specs::prelude::World;
+
+    let mut world = World::new();
+
+    SpatialWriteStorage::<Position>::setup(&mut world.res);
+
+    assert!(ComponentRegistry::get_interface(Position::ID).is_some());
+}
+
+#[test]
+fn should_only_join_authority() {
+    use crate::entities::SpatialEntitiesRes;
+    use crate::generated_test::*;
+    use crate::*;
+    use spatialos_sdk::worker::EntityId as WorkerEntityId;
+    use specs::prelude::*;
+
+    let mut world = World::new();
+
+    Entities::setup(&mut world.res);
+    EntityIds::setup(&mut world.res);
+    SpatialReadStorage::<Position>::setup(&mut world.res);
+    SpatialWriteStorage::<Position>::setup(&mut world.res);
+
+    let entity_id = EntityId(WorkerEntityId::new(5));
+
+    let data = Position {
+        coords: Coordinates {
+            x: 1.0,
+            y: 2.0,
+            z: 3.0,
+        },
+    };
+
+    {
+        world
+            .res
+            .fetch_mut::<SpatialEntitiesRes>()
+            .got_new_entity(&world.res, entity_id);
+    }
+
+    let entity = {
+        world
+            .res
+            .fetch::<SpatialEntitiesRes>()
+            .get_entity(entity_id)
+            .unwrap()
+    };
+
+    {
+        assert!((&SpatialReadStorage::<Position>::fetch(&world.res))
+            .join()
+            .next()
+            .is_none());
+    }
+
+    {
+        let mut storage = SpatialWriteStorage::<Position>::fetch(&world.res);
+        storage.insert(entity, SpatialComponent::new(data)).unwrap();
+    }
+
+    {
+        let mut storage = SpatialReadStorage::<Position>::fetch(&world.res);
+        assert!((&mut storage).join().next().is_some());
+    }
+
+    {
+        let mut storage = SpatialWriteStorage::<Position>::fetch(&world.res);
+        assert!(
+            (&mut storage).join().next().is_none(),
+            "WriteStorage should be empty as the worker is not authoritative."
+        );
+    }
+
+    {
+        world
+            .res
+            .fetch_mut::<AuthorityBitSet<Position>>()
+            .set_authority(entity, Authority::Authoritative);
+    }
+
+    {
+        let mut storage = SpatialReadStorage::<Position>::fetch(&world.res);
+        assert!((&mut storage).join().next().is_some());
+    }
+
+    {
+        let mut storage = SpatialWriteStorage::<Position>::fetch(&world.res);
+        assert!(
+            (&mut storage).join().next().is_some(),
+            "WriteStorage should be non-empty as the worker is authoritative."
+        );
     }
 }

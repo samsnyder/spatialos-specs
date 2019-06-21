@@ -9,7 +9,8 @@ use spatialos_sdk::worker::op::{
     ReserveEntityIdsResponseOp, ReservedEntityIdRange, StatusCode,
 };
 use spatialos_sdk::worker::query::EntityQuery;
-use spatialos_sdk::worker::{EntityId, RequestId};
+use spatialos_sdk::worker::EntityId as WorkerEntityId;
+use spatialos_sdk::worker::RequestId;
 use specs::prelude::{Resources, SystemData, Write};
 use std::collections::HashMap;
 
@@ -31,13 +32,14 @@ pub struct SystemCommandSenderRes {
         HashMap<RequestId<CreateEntityRequest>, IntermediateCallback<CreateEntityResponseOp>>,
     buffered_create_entity_requests: Vec<(
         NoAccessContainer<WorkerEntity>,
-        Option<EntityId>,
+        Option<WorkerEntityId>,
         IntermediateCallback<CreateEntityResponseOp>,
     )>,
 
     delete_entity_callbacks:
         HashMap<RequestId<DeleteEntityRequest>, IntermediateCallback<DeleteEntityResponseOp>>,
-    buffered_delete_entity_requests: Vec<(EntityId, IntermediateCallback<DeleteEntityResponseOp>)>,
+    buffered_delete_entity_requests:
+        Vec<(WorkerEntityId, IntermediateCallback<DeleteEntityResponseOp>)>,
 
     entity_query_callbacks:
         HashMap<RequestId<EntityQueryRequest>, IntermediateCallback<EntityQueryResponseOp>>,
@@ -64,10 +66,10 @@ impl SystemCommandSenderRes {
     pub fn create_entity<F>(
         &mut self,
         entity: WorkerEntity,
-        reserved_entity_id: Option<EntityId>,
+        reserved_entity_id: Option<WorkerEntityId>,
         callback: F,
     ) where
-        F: 'static + FnOnce(SystemCommandResponse<EntityId>) + Send + Sync,
+        F: 'static + FnOnce(SystemCommandResponse<WorkerEntityId>) + Send + Sync,
     {
         self.buffered_create_entity_requests.push((
             NoAccessContainer::new(entity),
@@ -81,7 +83,7 @@ impl SystemCommandSenderRes {
         ));
     }
 
-    pub fn delete_entity<F>(&mut self, entity_id: EntityId, callback: F)
+    pub fn delete_entity<F>(&mut self, entity_id: WorkerEntityId, callback: F)
     where
         F: 'static + FnOnce(SystemCommandResponse<()>) + Send + Sync,
     {
@@ -241,3 +243,56 @@ impl<T> NoAccessContainer<T> {
 // This is safe as the data inside cannot be accessed.
 unsafe impl<T> Send for NoAccessContainer<T> {}
 unsafe impl<T> Sync for NoAccessContainer<T> {}
+
+#[test]
+fn delete_entity_request_should_work() {
+    use spatialos_sdk::worker::EntityId as WorkerEntityId;
+    use specs::prelude::{System, World};
+
+    let mut world = World::new();
+
+    struct Sys;
+    impl<'a> System<'a> for Sys {
+        type SystemData = SystemCommandSender<'a>;
+        fn run(&mut self, _sys: Self::SystemData) {}
+    }
+
+    <Sys as System>::SystemData::setup(&mut world.res);
+
+    {
+        let mut system_command_sender = <Sys as System>::SystemData::fetch(&world.res);
+        system_command_sender.delete_entity(WorkerEntityId::new(5), |result| {
+            result.get_system_data::<_, Sys>(|system_command_sender, result| {
+                assert_eq!(
+                    0,
+                    system_command_sender.buffered_delete_entity_requests.len()
+                );
+                assert!(result.is_ok());
+            });
+        });
+    }
+
+    {
+        let mut requests = {
+            <Sys as System>::SystemData::fetch(&world.res)
+                .buffered_delete_entity_requests
+                .drain(..)
+                .collect::<Vec<_>>()
+        };
+
+        for (_entity_id, callback) in requests.drain(..) {
+            <Sys as System>::SystemData::fetch(&world.res)
+                .delete_entity_callbacks
+                .insert(RequestId::new(1), callback);
+        }
+    }
+
+    SystemCommandSenderRes::got_delete_entity_response(
+        &world.res,
+        DeleteEntityResponseOp {
+            request_id: RequestId::new(1),
+            entity_id: WorkerEntityId::new(5),
+            status_code: StatusCode::Success(()),
+        },
+    );
+}

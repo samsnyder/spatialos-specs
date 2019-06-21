@@ -217,3 +217,60 @@ impl<T: 'static + WorkerComponent> Default for CommandSenderRes<T> {
         }
     }
 }
+
+#[test]
+fn command_flow_should_work() {
+    use crate::entities::EntityId;
+    use crate::generated_test::*;
+    use spatialos_sdk::worker::EntityId as WorkerEntityId;
+    use specs::prelude::{System, World};
+
+    let mut world = World::new();
+
+    struct Sys;
+    impl<'a> System<'a> for Sys {
+        type SystemData = (CommandSender<'a, Position>, CommandRequests<'a, Position>);
+        fn run(&mut self, _sys: Self::SystemData) {}
+    }
+
+    let entity_id = EntityId(WorkerEntityId::new(5));
+
+    <Sys as System>::SystemData::setup(&mut world.res);
+
+    {
+        let (mut command_sender, _) = <Sys as System>::SystemData::fetch(&world.res);
+        command_sender.send_command(entity_id, PositionCommandRequest::UpdateCoords, |result| {
+            result.get_system_data::<_, Sys>(|(command_sender, _), result| {
+                assert_eq!(0, command_sender.buffered_requests.len());
+                assert!(result.is_err());
+            });
+        });
+    }
+
+    {
+        let mut requests = {
+            <Sys as System>::SystemData::fetch(&world.res)
+                .0
+                .buffered_requests
+                .drain(..)
+                .collect::<Vec<_>>()
+        };
+
+        for (_entity_id, _req, callback) in requests.drain(..) {
+            <Sys as System>::SystemData::fetch(&world.res)
+                .0
+                .callbacks
+                .insert(RequestId::new(1), callback);
+        }
+    }
+
+    CommandSenderRes::<Position>::got_command_response(
+        &world.res,
+        CommandResponseOp {
+            request_id: RequestId::new(1),
+            entity_id: entity_id.id(),
+            component_id: Position::ID,
+            response: StatusCode::Timeout(String::from("Timeout")),
+        },
+    );
+}
