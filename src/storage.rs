@@ -70,13 +70,11 @@ where
     }
 
     fn reads() -> Vec<ResourceId> {
-        vec![]
+        vec![ResourceId::new::<AuthorityBitSet<T>>()]
     }
 
     fn writes() -> Vec<ResourceId> {
-        let mut writes = WriteStorage::<SpatialComponent<T>>::writes();
-        writes.push(ResourceId::new::<AuthorityBitSet<T>>());
-        writes
+        WriteStorage::<SpatialComponent<T>>::writes()
     }
 }
 

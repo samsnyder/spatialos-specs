@@ -54,10 +54,7 @@ impl SpatialEntitiesRes {
     }
 
     pub fn get_entity(&self, entity_id: EntityId) -> Option<Entity> {
-        match self.entities.get(&entity_id) {
-            Some(entity) => Some(entity.clone()),
-            None => None,
-        }
+        self.entities.get(&entity_id).cloned()
     }
 }
 

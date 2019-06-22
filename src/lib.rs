@@ -15,7 +15,6 @@ pub use commands::{CommandRequests, CommandSender};
 pub use entities::{EntityId, EntityIds};
 pub use spatial_reader::SpatialReaderSystem;
 pub use spatial_writer::SpatialWriterSystem;
-pub use std::ops::{Deref, DerefMut};
 pub use storage::{SpatialReadStorage, SpatialWriteStorage};
 pub use system_commands::SystemCommandSender;
 
@@ -26,6 +25,7 @@ use spatialos_sdk::worker::connection::{Connection, WorkerConnection};
 use spatialos_sdk::worker::internal::schema::SchemaComponentUpdate;
 use specs::prelude::{Component, Resources, System, SystemData, VecStorage};
 use std::fmt::Debug;
+use std::ops::{Deref, DerefMut};
 
 /// A wrapper for a SpatialOS component data.
 ///

@@ -17,14 +17,21 @@ use std::collections::HashMap;
 /// A storage which contains command requests for a given component
 /// that have not been responded to yet.
 ///
-/// You can respond to the requests via the `respond` method, for example:
+/// You can respond to the requests via the [`respond`](struct.CommandRequestsComp.html#method.respond).
+///
+/// # Example
 ///
 /// ```ignore
 /// impl<'a> System<'a> for PlayerCreatorSys {
 ///     type SystemData = (CommandRequests<'a, Player>, SpatialWriteStorage<'a, Player>);
 ///
 ///     fn run(&mut self, (mut requests, mut player): Self::SystemData) {
+///
+///         // Iterate over all entities with `Player` command requests and authority
+///         // over `Player`.
 ///         for (request, player) in (&mut requests, &mut player).join() {
+///
+///             // Respond to every `Player` command request on this entity.
 ///             request.respond(|request, caller_worker_id, _| match request {
 ///                 PlayerCommandRequest::UpdateHealth(request) => {
 ///                     player.health -= request.damage;
@@ -45,13 +52,16 @@ use std::collections::HashMap;
 /// not be responded to. Please note that a command request will stay in this
 /// component until it has been responded too.
 ///
-/// A command will only be responded to in a single system. If `SysA` runs before
+/// A command can only be responded to in a single system. If `SysA` runs before
 /// `SysB` and `SysB` responds to a request, `SysB` cannot see that request.
 ///
 /// Asynchronous command responses are not yet supported.
-///
 pub type CommandRequests<'a, T> = WriteStorage<'a, CommandRequestsComp<T>>;
 
+/// A component which holds pending command requests for a given component.
+///
+/// Use [CommandRequests](type.CommandRequests.html) to get the storage in a system.
+/// Please see [CommandRequests](type.CommandRequests.html) for more details.
 pub struct CommandRequestsComp<T: WorkerComponent> {
     requests: Vec<(
         RequestId<IncomingCommandRequest>,
@@ -94,10 +104,14 @@ impl<T: 'static + WorkerComponent> CommandRequestsComp<T> {
     /// * `Some(response)` to respond to the command.
     /// * `None` to not respond to the command, leaving the request for other systems or
     ///   the next frame.
-    pub fn respond<F>(&mut self, mut responder: F)
-    where
-        F: FnMut(&T::CommandRequest, &String, &Vec<String>) -> Option<T::CommandResponse>,
-    {
+    pub fn respond(
+        &mut self,
+        mut responder: impl FnMut(
+            &T::CommandRequest,
+            &String,
+            &Vec<String>,
+        ) -> Option<T::CommandResponse>,
+    ) {
         let mut requests_left = Vec::new();
         for (request_id, request, caller_worker_id, caller_attribute_set) in self.requests.drain(..)
         {
@@ -143,10 +157,10 @@ impl<'a, T: 'static + WorkerComponent> CommandRequestsExt for CommandRequests<'a
     }
 }
 
+pub type CommandSender<'a, T> = Write<'a, CommandSenderRes<T>>;
+
 type CommandResponse<'a, T> =
     Result<&'a <T as WorkerComponent>::CommandResponse, StatusCode<WorkerCommandResponse<'a>>>;
-
-pub type CommandSender<'a, T> = Write<'a, CommandSenderRes<T>>;
 
 type CommandIntermediateCallback = Box<FnOnce(&Resources, CommandResponseOp) + Send + Sync>;
 
