@@ -1,4 +1,4 @@
-use crate::ValueWithSystemData;
+use crate::SystemDataFetch;
 use spatialos_sdk::worker::commands::{
     CreateEntityRequest, DeleteEntityRequest, EntityQueryRequest, ReserveEntityIdsRequest,
 };
@@ -16,7 +16,7 @@ use std::collections::HashMap;
 
 pub type SystemCommandSender<'a> = Write<'a, SystemCommandSenderRes>;
 
-type SystemCommandResponse<'a, T> = ValueWithSystemData<'a, Result<T, StatusCode<T>>>;
+type SystemCommandResult<T> = Result<T, StatusCode<T>>;
 
 type IntermediateCallback<O> = Box<FnOnce(&Resources, O) + Send + Sync>;
 
@@ -50,15 +50,18 @@ pub struct SystemCommandSenderRes {
 impl SystemCommandSenderRes {
     pub fn reserve_entity_ids<F>(&mut self, number: u32, callback: F)
     where
-        F: 'static + FnOnce(SystemCommandResponse<ReservedEntityIdRange>) + Send + Sync,
+        F: 'static
+            + FnOnce(SystemCommandResult<ReservedEntityIdRange>, SystemDataFetch)
+            + Send
+            + Sync,
     {
         self.buffered_reserve_entity_ids_requests.push((
             number,
             Box::new(|res, response_op| {
-                callback(SystemCommandResponse {
-                    res,
-                    value: SystemCommandSenderRes::status_code_to_result(response_op.status_code),
-                });
+                callback(
+                    SystemCommandSenderRes::status_code_to_result(response_op.status_code),
+                    SystemDataFetch::new(res),
+                );
             }),
         ));
     }
@@ -69,46 +72,46 @@ impl SystemCommandSenderRes {
         reserved_entity_id: Option<WorkerEntityId>,
         callback: F,
     ) where
-        F: 'static + FnOnce(SystemCommandResponse<WorkerEntityId>) + Send + Sync,
+        F: 'static + FnOnce(SystemCommandResult<WorkerEntityId>, SystemDataFetch) + Send + Sync,
     {
         self.buffered_create_entity_requests.push((
             NoAccessContainer::new(entity),
             reserved_entity_id,
             Box::new(|res, response_op| {
-                callback(SystemCommandResponse {
-                    res,
-                    value: SystemCommandSenderRes::status_code_to_result(response_op.status_code),
-                });
+                callback(
+                    SystemCommandSenderRes::status_code_to_result(response_op.status_code),
+                    SystemDataFetch::new(res),
+                );
             }),
         ));
     }
 
     pub fn delete_entity<F>(&mut self, entity_id: WorkerEntityId, callback: F)
     where
-        F: 'static + FnOnce(SystemCommandResponse<()>) + Send + Sync,
+        F: 'static + FnOnce(SystemCommandResult<()>, SystemDataFetch) + Send + Sync,
     {
         self.buffered_delete_entity_requests.push((
             entity_id,
             Box::new(|res, response_op| {
-                callback(SystemCommandResponse {
-                    res,
-                    value: SystemCommandSenderRes::status_code_to_result(response_op.status_code),
-                });
+                callback(
+                    SystemCommandSenderRes::status_code_to_result(response_op.status_code),
+                    SystemDataFetch::new(res),
+                );
             }),
         ));
     }
 
     pub fn entity_query<F>(&mut self, query: EntityQuery, callback: F)
     where
-        F: 'static + FnOnce(SystemCommandResponse<QueryResponse>) + Send + Sync,
+        F: 'static + FnOnce(SystemCommandResult<QueryResponse>, SystemDataFetch) + Send + Sync,
     {
         self.buffered_entity_query_requests.push((
             query,
             Box::new(|res, response_op| {
-                callback(SystemCommandResponse {
-                    res,
-                    value: SystemCommandSenderRes::status_code_to_result(response_op.status_code),
-                });
+                callback(
+                    SystemCommandSenderRes::status_code_to_result(response_op.status_code),
+                    SystemDataFetch::new(res),
+                );
             }),
         ));
     }
@@ -261,14 +264,13 @@ fn delete_entity_request_should_work() {
 
     {
         let mut system_command_sender = <Sys as System>::SystemData::fetch(&world.res);
-        system_command_sender.delete_entity(WorkerEntityId::new(5), |result| {
-            result.get_system_data::<_, Sys>(|system_command_sender, result| {
-                assert_eq!(
-                    0,
-                    system_command_sender.buffered_delete_entity_requests.len()
-                );
-                assert!(result.is_ok());
-            });
+        system_command_sender.delete_entity(WorkerEntityId::new(5), |result, system_data| {
+            let system_command_sender = system_data.fetch::<Sys>();
+            assert_eq!(
+                0,
+                system_command_sender.buffered_delete_entity_requests.len()
+            );
+            assert!(result.is_ok());
         });
     }
 

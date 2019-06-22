@@ -1,7 +1,7 @@
 use crate::component_registry::ComponentRegistry;
 use crate::entities::EntityId;
 use crate::storage::SpatialUnprotectedStorage;
-use crate::ValueWithSystemData;
+use crate::SystemDataFetch;
 use spatialos_sdk::worker::commands::{IncomingCommandRequest, OutgoingCommandRequest};
 use spatialos_sdk::worker::component::Component as WorkerComponent;
 use spatialos_sdk::worker::connection::{Connection, WorkerConnection};
@@ -143,10 +143,8 @@ impl<'a, T: 'static + WorkerComponent> CommandRequestsExt for CommandRequests<'a
     }
 }
 
-type CommandResponse<'a, T> = ValueWithSystemData<
-    'a,
-    Result<&'a <T as WorkerComponent>::CommandResponse, StatusCode<WorkerCommandResponse<'a>>>,
->;
+type CommandResponse<'a, T> =
+    Result<&'a <T as WorkerComponent>::CommandResponse, StatusCode<WorkerCommandResponse<'a>>>;
 
 pub type CommandSender<'a, T> = Write<'a, CommandSenderRes<T>>;
 
@@ -160,7 +158,7 @@ pub struct CommandSenderRes<T: WorkerComponent> {
 impl<T: 'static + WorkerComponent> CommandSenderRes<T> {
     pub fn send_command<F>(&mut self, entity_id: EntityId, request: T::CommandRequest, callback: F)
     where
-        F: 'static + FnOnce(CommandResponse<T>) + Send + Sync,
+        F: 'static + FnOnce(CommandResponse<T>, SystemDataFetch) + Send + Sync,
     {
         self.buffered_requests.push((
             entity_id,
@@ -168,15 +166,9 @@ impl<T: 'static + WorkerComponent> CommandSenderRes<T> {
             Box::new(|res, response_op| match response_op.response {
                 StatusCode::Success(response) => {
                     let response = response.get::<T>().unwrap();
-                    callback(CommandResponse::<T> {
-                        res,
-                        value: Ok(response),
-                    })
+                    callback(Ok(response), SystemDataFetch::new(res))
                 }
-                other => callback(CommandResponse::<T> {
-                    res,
-                    value: Err(other),
-                }),
+                other => callback(Err(other), SystemDataFetch::new(res)),
             }),
         ));
     }
@@ -239,12 +231,15 @@ fn command_flow_should_work() {
 
     {
         let (mut command_sender, _) = <Sys as System>::SystemData::fetch(&world.res);
-        command_sender.send_command(entity_id, PositionCommandRequest::UpdateCoords, |result| {
-            result.get_system_data::<_, Sys>(|(command_sender, _), result| {
+        command_sender.send_command(
+            entity_id,
+            PositionCommandRequest::UpdateCoords,
+            |result, system_data| {
+                let (command_sender, _) = system_data.fetch::<Sys>();
                 assert_eq!(0, command_sender.buffered_requests.len());
                 assert!(result.is_err());
-            });
-        });
+            },
+        );
     }
 
     {

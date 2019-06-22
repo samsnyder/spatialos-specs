@@ -129,38 +129,20 @@ impl<T: 'static + WorkerComponent> Component for SpatialComponent<T> {
     type Storage = SpatialUnprotectedStorage<T, Self, VecStorage<Self>>;
 }
 
-/// Represents a value along with the ability to get a system's `SystemData`.
-///
-/// This is used as responses to commands, where the user needs access to
-/// `SystemData` in order to perform actions based on a response.
-///
-#[doc(hidden)]
-pub struct ValueWithSystemData<'a, T> {
+pub struct SystemDataFetch<'a> {
     res: &'a Resources,
-    value: T,
 }
 
-impl<'a, T> Deref for ValueWithSystemData<'a, T> {
-    type Target = T;
-
-    fn deref(&self) -> &Self::Target {
-        &self.value
+impl<'a> SystemDataFetch<'a> {
+    pub(crate) fn new(res: &'a Resources) -> SystemDataFetch<'a> {
+        SystemDataFetch { res }
     }
-}
 
-impl<'a, T> DerefMut for ValueWithSystemData<'a, T> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.value
-    }
-}
-
-impl<'a, T> ValueWithSystemData<'a, T> {
-    pub fn get_system_data<F, S>(self, cb: F)
+    pub fn fetch<S>(self) -> S::SystemData
     where
         S: System<'a>,
         S::SystemData: SystemData<'a> + 'a,
-        F: 'a + FnOnce(S::SystemData, T),
     {
-        cb(S::SystemData::fetch(self.res), self.value);
+        S::SystemData::fetch(self.res)
     }
 }
